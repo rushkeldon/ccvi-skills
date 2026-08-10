@@ -1,0 +1,216 @@
+{
+  "name": "ccvi-skills",
+  "version": "0.0.2",
+  "skills": [
+    {
+      "name": "modes",
+      "invocation": "/modes [verb] [param]",
+      "verbs": [
+        {
+          "name": "plan",
+          "params": [
+            {
+              "name": "dir",
+              "required": false,
+              "kind": "dir",
+              "default": "./"
+            }
+          ]
+        },
+        {
+          "name": "agent",
+          "params": []
+        },
+        {
+          "name": "agent-loop",
+          "params": [
+            {
+              "name": "pct",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "one-word",
+          "params": []
+        },
+        {
+          "name": "sbs",
+          "params": []
+        },
+        {
+          "name": "exclude",
+          "params": [
+            {
+              "name": "patterns",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "include",
+          "params": [
+            {
+              "name": "patterns",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "exit",
+          "params": [
+            {
+              "name": "mode",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "params": []
+        },
+        {
+          "name": "clear",
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "plans",
+      "invocation": "/plans [verb] [args]",
+      "verbs": [
+        {
+          "name": "write",
+          "params": [
+            {
+              "name": "name",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "review",
+          "params": [
+            {
+              "name": "plan",
+              "required": true,
+              "kind": "plan-file"
+            },
+            {
+              "name": "out",
+              "required": false,
+              "kind": "dir",
+              "default": "./"
+            },
+            {
+              "name": "model",
+              "required": false,
+              "kind": "model"
+            }
+          ]
+        },
+        {
+          "name": "verify",
+          "params": [
+            {
+              "name": "plan",
+              "required": true,
+              "kind": "plan-file"
+            },
+            {
+              "name": "out",
+              "required": false,
+              "kind": "dir",
+              "default": "./"
+            },
+            {
+              "name": "model",
+              "required": false,
+              "kind": "model"
+            }
+          ]
+        },
+        {
+          "name": "update",
+          "params": [
+            {
+              "name": "plan",
+              "required": true,
+              "kind": "plan-file"
+            },
+            {
+              "name": "report",
+              "required": true,
+              "kind": "file"
+            }
+          ]
+        },
+        {
+          "name": "build",
+          "params": [
+            {
+              "name": "plan",
+              "required": true,
+              "kind": "plan-file"
+            },
+            {
+              "name": "model",
+              "required": false,
+              "kind": "model"
+            }
+          ]
+        },
+        {
+          "name": "archive",
+          "params": [
+            {
+              "name": "dir",
+              "required": false,
+              "kind": "dir"
+            },
+            {
+              "name": "archiveDir",
+              "required": false,
+              "kind": "dir"
+            },
+            {
+              "name": "lenient",
+              "required": false,
+              "kind": "flag",
+              "default": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "seedprompt",
+      "invocation": "/seedprompt [verb] [args]",
+      "verbs": [
+        {
+          "name": "write",
+          "params": [
+            {
+              "name": "body",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "show",
+          "params": []
+        },
+        {
+          "name": "clear",
+          "params": []
+        }
+      ]
+    }
+  ]
+}

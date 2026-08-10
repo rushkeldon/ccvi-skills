@@ -13,9 +13,14 @@ displayed and packages the one zip artifact:
      token, so the source always reads as a valid, if occasionally stale, file.
   3. update the "ccvi-skills · vN.N.N" display in README.md (skipped with a
      notice when README.md does not exist yet).
-  4. PACKAGE ccvi-skills.zip at the repo root: the plugin/ tree at the zip root,
-     reproducibly (fixed zip metadata, sorted member order - an unchanged build
-     produces a byte-identical zip, no spurious git churn).
+  4. EMIT manifest.json - the machine-readable signatures contract for hosts
+     (ccvi-idea reads it to drive its verb dialogs and to version-gate its
+     bundle without opening the zip). Written BOTH beside the zip at the repo
+     root AND into the zip root. The MANIFEST structure below is the canonical
+     source for verb signatures; SKILL.md prose is documentation.
+  5. PACKAGE ccvi-skills.zip at the repo root: the plugin/ tree at the zip root
+     plus manifest.json, reproducibly (fixed zip metadata, sorted member order -
+     an unchanged build produces a byte-identical zip, no spurious git churn).
 
 Usage:
   python3 build.py           # stamp + readme + package (a full build)
@@ -63,6 +68,79 @@ README_RE = re.compile(r"ccvi-skills · v\d+\.\d+\.\d+")
 
 PLUGIN_DIR = p("plugin")
 ZIP_OUT = p("ccvi-skills.zip")
+MANIFEST_OUT = p("manifest.json")
+
+# ---------------------------------------------------------------------------------
+# The signatures manifest - the machine-readable contract hosts consume.
+# Params are ORDERED (positional order of the verb's signature); every param
+# carries its literal name and required flag; `kind` is a hint from the vocabulary
+# {plan-file, dir, file, model, flag, freeform}; `default` appears where one exists.
+# When a verb or param changes in a SKILL.md, change it HERE in the same commit -
+# --check cross-checks verb names against the SKILL.md prose as a drift tripwire.
+# ---------------------------------------------------------------------------------
+
+def _param(name, required, kind=None, default=None):
+  d = {"name": name, "required": required}
+  if kind is not None:
+    d["kind"] = kind
+  if default is not None:
+    d["default"] = default
+  return d
+
+
+MANIFEST_SKILLS = [
+  {
+    "name": "modes",
+    "invocation": "/modes [verb] [param]",
+    "verbs": [
+      {"name": "plan", "params": [_param("dir", False, "dir", "./")]},
+      {"name": "agent", "params": []},
+      {"name": "agent-loop", "params": [_param("pct", False, "freeform")]},
+      {"name": "one-word", "params": []},
+      {"name": "sbs", "params": []},
+      {"name": "exclude", "params": [_param("patterns", True, "freeform")]},
+      {"name": "include", "params": [_param("patterns", True, "freeform")]},
+      {"name": "exit", "params": [_param("mode", True, "freeform")]},
+      {"name": "list", "params": []},
+      {"name": "clear", "params": []},
+    ],
+  },
+  {
+    "name": "plans",
+    "invocation": "/plans [verb] [args]",
+    "verbs": [
+      {"name": "write", "params": [_param("name", False, "freeform")]},
+      {"name": "review", "params": [_param("plan", True, "plan-file"),
+                                    _param("out", False, "dir", "./"),
+                                    _param("model", False, "model")]},
+      {"name": "verify", "params": [_param("plan", True, "plan-file"),
+                                    _param("out", False, "dir", "./"),
+                                    _param("model", False, "model")]},
+      {"name": "update", "params": [_param("plan", True, "plan-file"),
+                                    _param("report", True, "file")]},
+      {"name": "build", "params": [_param("plan", True, "plan-file"),
+                                   _param("model", False, "model")]},
+      {"name": "archive", "params": [_param("dir", False, "dir"),
+                                     _param("archiveDir", False, "dir"),
+                                     _param("lenient", False, "flag", "0")]},
+    ],
+  },
+  {
+    "name": "seedprompt",
+    "invocation": "/seedprompt [verb] [args]",
+    "verbs": [
+      {"name": "write", "params": [_param("body", False, "freeform")]},
+      {"name": "show", "params": []},
+      {"name": "clear", "params": []},
+    ],
+  },
+]
+
+
+def manifest_bytes(version):
+  """The manifest as deterministic bytes (stable key order, trailing newline)."""
+  data = {"name": "ccvi-skills", "version": version, "skills": MANIFEST_SKILLS}
+  return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 # Never packaged, even if they appear under plugin/.
 ZIP_EXCLUDE_DIRS = {"__pycache__"}
@@ -138,36 +216,68 @@ def zip_members():
   return members
 
 
-def zip_bytes():
-  """Build the artifact in memory - deterministic, so equality means current."""
+def zip_bytes(version):
+  """Build the artifact in memory - deterministic, so equality means current.
+  Members: the plugin/ tree at the zip root, plus manifest.json."""
+  extra = [("manifest.json", manifest_bytes(version))]
   buf = io.BytesIO()
   with zipfile.ZipFile(buf, "w") as zf:
-    for arcname, src in zip_members():
+    members = [(arc, None, blob) for arc, blob in extra]
+    members += [(arc, src, None) for arc, src in zip_members()]
+    for arcname, src, blob in sorted(members):
       info = zipfile.ZipInfo(arcname, date_time=_ZIP_EPOCH)
       info.compress_type = zipfile.ZIP_DEFLATED
       # Executable bit for scripts, plain for everything else.
       perm = 0o755 if arcname.endswith((".py", ".sh")) else 0o644
       info.external_attr = perm << 16
-      with open(src, "rb") as fh:
-        zf.writestr(info, fh.read())
+      if blob is None:
+        with open(src, "rb") as fh:
+          blob = fh.read()
+      zf.writestr(info, blob)
   return buf.getvalue()
 
 
-def package():
-  """(Re)write ccvi-skills.zip from current source."""
-  blob = zip_bytes()
+def package(version):
+  """(Re)write manifest.json and ccvi-skills.zip from current source."""
+  with open(MANIFEST_OUT, "wb") as fh:
+    fh.write(manifest_bytes(version))
+  blob = zip_bytes(version)
   tmp = ZIP_OUT + ".tmp"
   with open(tmp, "wb") as fh:
     fh.write(blob)
   os.replace(tmp, ZIP_OUT)
 
 
-def zip_current():
+def zip_current(version):
   """True when the on-disk artifact byte-matches a fresh deterministic build."""
   if not os.path.isfile(ZIP_OUT):
     return False
   with open(ZIP_OUT, "rb") as fh:
-    return fh.read() == zip_bytes()
+    return fh.read() == zip_bytes(version)
+
+
+def manifest_current(version):
+  """True when the sibling manifest.json byte-matches a fresh emit."""
+  if not os.path.isfile(MANIFEST_OUT):
+    return False
+  with open(MANIFEST_OUT, "rb") as fh:
+    return fh.read() == manifest_bytes(version)
+
+
+def manifest_drift():
+  """Cheap tripwire: every plans/seedprompt/modes verb named in the manifest must
+  appear as `/<skill> <verb>` (or a directive-table row) in its SKILL.md prose.
+  Catches a verb rename that touched SKILL.md but not MANIFEST_SKILLS. Returns a
+  list of problem strings."""
+  problems = []
+  for skill in MANIFEST_SKILLS:
+    md = _read(p("plugin", "skills", skill["name"], "SKILL.md"))
+    for verb in skill["verbs"]:
+      token = "/{} {}".format(skill["name"], verb["name"])
+      if token not in md and "`{}`".format(verb["name"]) not in md:
+        problems.append("manifest verb `{}` not found in {} SKILL.md".format(
+          token, skill["name"]))
+  return problems
 
 
 def do_check():
@@ -183,29 +293,38 @@ def do_check():
     print("notice: README.md not present - skipping its version check")
   elif readme:
     problems.append("README ccvi-skills display != " + version)
-  if not zip_current():
+  if not manifest_current(version):
+    problems.append("manifest.json is stale or missing - run python3 build.py")
+  problems.extend(manifest_drift())
+  if not zip_current(version):
     problems.append("ccvi-skills.zip is stale or missing - run python3 build.py")
   if problems:
     print("build --check FAIL:")
     for pr in problems:
       print("  - " + pr)
     return 1
-  print("build --check OK — version {} stamped everywhere; zip current".format(version))
+  print("build --check OK — version {} stamped everywhere; manifest + zip current".format(version))
   return 0
 
 
 def do_build():
   version = canon_version()
+  drift = manifest_drift()
+  if drift:
+    print("build FAIL — manifest out of sync with SKILL.md prose:")
+    for pr in drift:
+      print("  - " + pr)
+    return 1
   stamped = stamp(version)
   readme = update_readme(version)
-  package()
+  package(version)
   print("build OK — ccvi-skills v{}".format(version))
   print("  stamped:  {} file(s)".format(len(stamped)) if stamped else "  stamped:  already current")
   if readme is None:
     print("  README:   not present - skipped (authored later; rerun build.py after)")
   else:
     print("  README:   {}".format("updated" if readme else "already current"))
-  print("  packaged: ccvi-skills.zip")
+  print("  packaged: manifest.json, ccvi-skills.zip")
   return 0
 
 

@@ -9,7 +9,7 @@ tightly-coupled Claude Code skills - `modes`, `plans`, and `seedprompt` - shippe
 > enforcement hook, the `<ccvi-modes>` sentinel, the Plan Editor, the seedprompt
 > rollover relay), and each skill assumes its siblings are installed.
 
-Current version: ccvi-skills · v0.0.1
+Current version: ccvi-skills · v0.0.2
 
 ## The skills
 
@@ -36,7 +36,9 @@ claude plugin install ccvi-skills
 The plugin payload is everything under [plugin/](plugin/): the manifest (which also
 registers the modes enforcement hook), the three skills, and the hook script.
 `ccvi-skills.zip` at the repo root is the same tree, packaged reproducibly by
-[build.py](build.py).
+[build.py](build.py). [manifest.json](manifest.json) - emitted beside the zip and
+into its root - is the machine-readable signatures contract for hosts: the suite
+version plus each skill's verbs with ordered, typed param lists.
 
 ## Development
 

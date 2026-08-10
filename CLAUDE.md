@@ -23,7 +23,8 @@ ccvi-skills/
     skills/plans/tools/              - plan-check.cjs, archive-plans.sh, vendor/js-yaml.min.js
     skills/seedprompt/SKILL.md
   test/test_modes.py                 - golden harness; dev-only, never packaged
-  build.py                           - stamp + README + zip + --check
+  build.py                           - stamp + README + manifest + zip + --check
+  manifest.json                      - built artifact: signatures contract for hosts
   doc/                               - plans live here; doc/archive/ for finished ones
   README.md
   CLAUDE.md
@@ -52,6 +53,27 @@ ccvi-skills/
   stamps, it never bumps.
 - `python3 build.py --check` must exit 0 before any release: it verifies all stamps
   and the zip's currency.
+
+## Consumer contracts (ccvi-idea depends on these - breaking one is a MAJOR event)
+
+The ccvi-idea build pulls this repo's artifacts and hard-depends on:
+
+- **Zip layout:** the zip root IS the plugin payload (ccvi-idea extracts it to
+  `~/.ccvi/ccvi-skills/plugin/`), and `skills/plans/SKILL.md` exists at that root
+  (treat every `skills/<skill>/SKILL.md` path the same way). Moving either is a
+  breaking change: it takes a deliberate major-style version decision AND a
+  heads-up to ccvi-idea before it lands - never a silent refactor.
+- **`manifest.json`** - the machine-readable signatures contract, emitted by
+  build.py both beside the zip (so Gradle/Kotlin read the version without opening
+  the archive) and inside the zip root. It carries the plugin version and, per
+  skill, the verbs with ORDERED param lists (literal `name`, `required`, optional
+  `kind` hint from {plan-file, dir, file, model, flag, freeform}, optional
+  `default`). The `MANIFEST_SKILLS` structure in build.py is the canonical source:
+  **any verb or param change in a SKILL.md must update it in the same commit**
+  (`--check` has a drift tripwire, but it only catches renames, not param edits).
+  SKILL.md prose is documentation; the JSON is the contract hosts consume.
+- **Marketplace shape:** repo-as-marketplace with `.claude-plugin/marketplace.json`
+  pointing at `plugin/` - the install pipeline is designed around it; keep it.
 
 ## BBP - bump, build, push (the end-of-work ritual)
 
