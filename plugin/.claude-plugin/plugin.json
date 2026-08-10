@@ -1,0 +1,23 @@
+{
+  "name": "ccvi-skills",
+  "version": "0.0.0",
+  "description": "The CCVI family's skill suite — persistent response modes via /modes [verb], plan lifecycle verbs via /plans [verb], and one-use session hand-off seeds via /seedprompt [verb].",
+  "author": {
+    "name": "Keldon Rush",
+    "email": "keldon@appcloud9.com"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/enforce_modes.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

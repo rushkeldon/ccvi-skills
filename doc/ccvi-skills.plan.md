@@ -1,58 +1,63 @@
 ---
 humanEngineerDifficulty: 5
 name: ccvi-skills suite - bundle modes, plans, seedprompt as one plugin
-version: "1.0"
+version: "1.1"
 overview: "Populate this repo with the ccvi-skills Claude Code plugin: the modes, plans, and seedprompt skills ported from ../skills-anthropic as one tightly-coupled suite - surfaces other than Claude Code stripped, cross-skill requirements made explicit, one version (starting 0.0.0) stamped everywhere, one build script, one zip artifact, standard marketplace install."
 todos:
   - id: scaffold
     content: "Create the repo skeleton: root .claude-plugin/marketplace.json pointing at ./plugin, plugin/.claude-plugin/plugin.json at 0.0.0 carrying the PreToolUse hook registration, plugin/skills/ dirs, .gitignore"
-    status: pending
+    status: completed
     phase: "Scaffold"
   - id: port-modes
     content: "Copy the modes skill (SKILL.md, scripts/modes.py) and hooks/enforce_modes.py from ../skills-anthropic into plugin/"
-    status: pending
+    status: completed
     phase: "Port"
   - id: port-plans
     content: "Copy the plans skill (SKILL.md, tools/ including the vendored js-yaml) into plugin/skills/plans/"
-    status: pending
+    status: completed
     phase: "Port"
   - id: port-seedprompt
     content: "Copy the seedprompt SKILL.md into plugin/skills/seedprompt/"
-    status: pending
+    status: completed
     phase: "Port"
   - id: adapt-tests
-    content: "Carry test/test_modes.py over, re-point its path constants at plugin/, and run it green before any prose editing"
-    status: pending
+    content: "Carry test/test_modes.py over, re-point its paths at plugin/, drop the cross-surface and build.py checks, re-stamp the modes help displays to the suite version, and run it green before any prose editing"
+    status: completed
     phase: "Port"
   - id: strip-surface-branches
-    content: "Sweep all three SKILL.md files removing non-Claude-Code surface branches per the strip/keep policy; LAW blocks stay byte-identical"
-    status: pending
+    content: "Sweep all three SKILL.md files plus modes.py comments removing non-Claude-Code surface branches per the strip/keep policy; LAW blocks stay byte-identical"
+    status: completed
     phase: "Tighten"
   - id: harden-coupling
     content: "Make co-installation explicit: /plans build always bridges via /modes agent, seedprompt assumes the CCVI consumer, hedges about absent sibling skills removed"
-    status: pending
+    status: completed
     phase: "Tighten"
   - id: fence-sweep
     content: "Tag every untagged fence opener in modes and seedprompt SKILL.md per the plans fence rule, except the two byte-locked LAW fences"
-    status: pending
+    status: completed
     phase: "Tighten"
   - id: version-displays
     content: "Give all three skills' help outputs a suite-version display reading the current plugin.json version"
-    status: pending
+    status: completed
     phase: "Tighten"
   - id: suite-build-script
-    content: "Write build.py (stamp version into help outputs and modes.py, update the README version, package ccvi-skills.zip reproducibly, --check mode), derived from ../skills-anthropic/modes/build.py"
-    status: pending
+    content: "Write build.py (stamp version into help outputs and modes.py, update the README version when README exists, package ccvi-skills.zip reproducibly, --check mode), derived from ../skills-anthropic/modes/build.py"
+    status: completed
     phase: "Release"
   - id: author-docs
     content: "Write README.md (CCVI-family positioning, standard install, skills table) and CLAUDE.md (layout, versioning scheme, release procedure, hard rules)"
-    status: pending
+    status: completed
     phase: "Release"
   - id: release-verify
     content: "Run build.py and the tests, install the plugin via the standard marketplace flow, and verify end-to-end: skills invoke, the hook blocks, versions display"
-    status: pending
+    status: completed
     phase: "Release"
 isProject: false
+updates:
+  - type: review
+    model: "claude-opus-5[1m]"
+    at: "2026-08-10T02:44Z"
+    version: "1.1"
 ---
 
 # ccvi-skills suite - bundle modes, plans, seedprompt as one plugin
@@ -212,24 +217,47 @@ is empty).
 
 ### 5. Adapt the test harness (`adapt-tests`)
 
-Copy `../skills-anthropic/modes/test/test_modes.py` → `test/test_modes.py`. Re-point
-its path constants (`SCRIPT`, `SKILL_MD`, `HOOK` - currently built from a
-`modes/code/...` layout) at `plugin/skills/modes/...` and `plugin/hooks/...`. Change
-nothing else unless a path-shaped assumption forces it; if an assertion fails for a
-non-path reason, that is a reality mismatch - stop and surface, do not adjust the
-assertion.
+Copy `../skills-anthropic/modes/test/test_modes.py` → `test/test_modes.py`, then make
+exactly these four adaptations - the harness carries three assumptions from the
+multi-surface source repo that do not survive the port, all resolved here by decision
+rather than discovered at run time:
+
+1. **Re-point the path constants** (`SCRIPT`, `SKILL_MD`, `HOOK` - currently built from
+   a `modes/code/...` layout) at `plugin/skills/modes/...` and `plugin/hooks/...`.
+2. **Re-point the `help/version-header` check's version read** (it opens
+   `modes/code/.claude-plugin/plugin.json`) at `plugin/.claude-plugin/plugin.json` -
+   and, so that check passes, **re-stamp the two modes help displays** from
+   `Modes · v4.6.0` to `Modes · v0.0.0`: the help-header line in
+   `plugin/skills/modes/SKILL.md` and the `HELP_TEXT` constant in
+   `plugin/skills/modes/scripts/modes.py`. This is the one sanctioned edit to ported
+   payload files in the Port phase (it cannot wait for the Tighten phase: the harness
+   must go green now to serve as the tripwire). The LAW byte-lock is untouched - the
+   help header is not part of any LAW block.
+3. **Delete the `surface/skill-md` and `surface/script` checks** (cross-surface
+   parity) - the cowork/chat copies they compare against are retired with the
+   surfaces and do not exist in this repo.
+4. **Delete the `build/in-sync` check** - it ran the old `modes/build.py`; the suite's
+   build sync is verified directly by `python3 build.py --check` (step 10 and
+   Verification 2), so the harness stays focused on the modes contract it byte-locks.
+
+Beyond these four, change nothing; if an assertion fails for any other reason, that is
+a reality mismatch - stop and surface, do not adjust the assertion.
 
 **Why now:** the harness locks the LAW blocks and echo contract BEFORE the Tighten
 phase edits any prose - it is the tripwire that proves the tightening never touched
 what it must not.
 
-**Done-when:** `python3 test/test_modes.py` exits 0 against the freshly ported,
-unedited files.
+**Done-when:** `python3 test/test_modes.py` exits 0 against the ported files, with only
+the four licensed adaptations above applied.
 
 ### 6. Strip the non-Claude-Code surface branches (`strip-surface-branches`)
 
-An editorial sweep over all three `plugin/skills/*/SKILL.md` files. The deciding test
-for every hedge, branch, or aside:
+An editorial sweep over all three `plugin/skills/*/SKILL.md` files **plus the comments
+in `plugin/skills/modes/scripts/modes.py`** (its session-resolution docstring mentions
+"Chat/Desktop/etc." and its agent-notes comment mentions "surfaces without hooks
+(Chat/Cowork)" - both sit inside `plugin/skills/`, so the grep below sees them). Editing
+those comments is safe: the test byte-lock covers only the LAW constants and the echo
+contract, never comments. The deciding test for every hedge, branch, or aside:
 
 - **REMOVE** if its only trigger is a non-Claude-Code Anthropic surface: mentions of
   Chat, Cowork, Claude Desktop as execution surfaces; "no session id resolvable
@@ -301,15 +329,15 @@ either a closer or one of the two LAW-block openers (modes only); test harness e
 
 One suite version, visible at each skill's front door:
 
-- modes already displays `Modes · v4.6.0` in its help output (in both SKILL.md and
-  modes.py). Re-stamp both to `0.0.0` now (build.py owns this from here on).
+- modes' two displays (the SKILL.md help header and modes.py's `HELP_TEXT`) were
+  already re-stamped to `Modes · v0.0.0` in step 5, where the test harness forced the
+  ordering - verify they read `0.0.0`; do not re-edit.
 - Give the plans and seedprompt help outputs an equivalent display - the suite version
   on the help header line, same `· v0.0.0` idiom, placed so a later regex stamp
   (a real version string replaced in place, no placeholder tokens - the source
   build.py's technique) can find it unambiguously.
-- test_modes.py asserts exact stdout: if its golden text embeds the old version
-  string, update the golden data to match - that is a version-shaped change, not a
-  contract change.
+- No golden-data edit is needed in test_modes.py: per step 5 it reads the expected
+  version from `plugin/.claude-plugin/plugin.json`, which already says `0.0.0`.
 
 **Done-when:** all three help outputs display `0.0.0`; `grep -rn '4\.6\.0\|3\.2\.0\|1\.1\.0' plugin/` finds no stale per-skill version strings; the test
 harness exits 0.
@@ -323,7 +351,13 @@ metadata, `--check` for CI):
 1. Read the canonical version from `plugin/.claude-plugin/plugin.json`.
 2. Stamp it into every version display: modes SKILL.md + modes.py help lines, plans
    SKILL.md help line, seedprompt SKILL.md help line.
-3. Update the version shown in `README.md`.
+3. Update the version shown in `README.md`, anchored on the distinctive
+   `ccvi-skills · v<semver>` string (the same anchored-regex technique as the source's
+   `Modes · v` stamp, so the substitution can never hit an unrelated version-looking
+   string). README.md is authored in step 11, AFTER this step first runs: when
+   README.md is absent, skip this stamp with a printed notice instead of failing, and
+   have `--check` likewise treat a missing README as a notice, not drift. Step 11's
+   done-when re-runs build.py to close the loop.
 4. Package `ccvi-skills.zip` at repo root: the `plugin/` tree at the zip root
    (`.claude-plugin/plugin.json`, `hooks/**`, `skills/**` - nothing else), with fixed
    zip metadata so an unchanged build is byte-identical.
@@ -345,7 +379,8 @@ test/, build.py, README); the zipped SKILL.md files byte-match `plugin/`'s
   want); the skills table with their invocation signatures; standard install
   (`claude plugin marketplace add <this repo>` + `claude plugin install ccvi-skills`)
   framed as the development workflow, noting CCVI installs the plugin automatically
-  for end users; the current version (stamped by build.py).
+  for end users; the current version, displayed as the anchored `ccvi-skills · v0.0.0`
+  string that build.py's README stamp targets (step 10).
 - **CLAUDE.md**: the repo layout; the tight-coupling doctrine (skills may assume each
   other and the CCVI host; no surface variants, ever); the versioning scheme and
   release procedure (bump plugin.json → `python3 build.py` → review → user commits);

@@ -1,0 +1,11 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Python bytecode (e.g. from running the modes test harness)
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store

@@ -1,0 +1,14 @@
+{
+  "name": "ccvi-skills",
+  "description": "The CCVI family's skill suite — modes, plans, and seedprompt as one tightly-coupled Claude Code plugin.",
+  "owner": {
+    "name": "Keldon Rush"
+  },
+  "plugins": [
+    {
+      "name": "ccvi-skills",
+      "source": "./plugin",
+      "description": "The modes, plans, and seedprompt skills for the CCVI family (Claude Code via IDE), as one plugin: persistent response modes via /modes [verb], plan lifecycle verbs via /plans [verb], and session hand-off seeds via /seedprompt [verb]."
+    }
+  ]
+}
