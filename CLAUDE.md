@@ -48,12 +48,28 @@ ccvi-skills/
 - The suite version lives **only** in `plugin/.claude-plugin/plugin.json`. It starts
   at `0.0.0` and increments patch-wise: `0.0.1` ... `0.0.99`, then rolls to `0.1.0`.
   `1.0.0` is a deliberate future ship decision, not an increment.
-- Release procedure: bump the version in `plugin/.claude-plugin/plugin.json`, run
-  `python3 build.py` (stamps every display, updates the README, rebuilds
-  `ccvi-skills.zip`), review the diff, and the **user** commits. Never bump inside
-  build.py; the script stamps, it never bumps.
+- Release procedure is **BBP** (below). Never bump inside build.py; the script
+  stamps, it never bumps.
 - `python3 build.py --check` must exit 0 before any release: it verifies all stamps
   and the zip's currency.
+
+## BBP - bump, build, push (the end-of-work ritual)
+
+At the end of any finished bit of work - a plan built, a fix landed, any coherent
+chunk done - run **BBP** automatically, without being asked:
+
+1. **bump** - read the current version from `plugin/.claude-plugin/plugin.json` and
+   increment the LAST segment: `0.0.0` → `0.0.1` → ... → `0.0.99`, then roll over to
+   `0.1.0`. Edit plugin.json only; build.py propagates from there.
+2. **build** - run `python3 build.py`. This stamps the new version into every help
+   display AND into `README.md` (the README displays the current version - never
+   skip the build thinking only code changed), and rebuilds `ccvi-skills.zip`.
+   Then verify: `python3 build.py --check` and `python3 test/test_modes.py` both
+   exit 0.
+3. **push** - `git add -A`, commit with a message describing the work (not just
+   "bump"), and push to `main`.
+
+The user typing `BBP` (any casing) is a direct order to run the ritual now.
 
 ## Hard rules
 
@@ -70,7 +86,9 @@ ccvi-skills/
   into `doc/archive/` (`/plans archive doc`).
 - **`../skills-anthropic` is a frozen quarry** - read-only reference; never write to
   it, and never re-import its multi-surface machinery.
-- No commits or pushes by agents; the user commits.
+- Commits and pushes happen through the **BBP** ritual (see above) at the end of a
+  finished bit of work - not mid-work, and never with unrelated changes swept in
+  unknowingly.
 
 ## Future direction (named so nobody re-invents it)
 
