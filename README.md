@@ -9,7 +9,7 @@ tightly-coupled Claude Code skills - `modes`, `plans`, and `seedprompt` - shippe
 > enforcement hook, the `<ccvi-modes>` sentinel, the Plan Editor, the seedprompt
 > rollover relay), and each skill assumes its siblings are installed.
 
-Current version: ccvi-skills · v0.0.2
+Current version: ccvi-skills · v0.0.3
 
 ## The skills
 
@@ -25,61 +25,69 @@ plugin prefix is new (`ccvi-skills:modes`, `ccvi-skills:plans`,
 
 ## The /plans lifecycle
 
-Phase 1 is **collaborate** - the unofficial one: no verb, no dialog. You and the agent
+Phase 0 is **collaborate** - the unofficial one: no verb, no dialog. You and the agent
 talk the work through (typically in `/modes plan`, which fences writes to markdown)
 until the shape is agreed. Every phase after it is an explicit verb, and the verbs are
 **independent atoms**: nothing auto-runs the next one, so you compose the loop and can
 re-enter any phase at any time.
 
+Note where the two graders sit: **`review` is the pre-build gate** (is this plan
+buildable as written?) while **`verify` is the post-build audit** (did it actually
+land?). `verify` only has something to say once `build` has flipped statuses - before
+that every todo is `pending` and there is nothing to audit. Steps 6 and 7 are the
+remediation loop: when a verify finds gaps, `update` records the truth and `build`
+finishes the work, then verify again. `archive` waits until every todo is terminal.
+
 ```diagram
-   ┌── 1. COLLABORATE ─────────────────────────────────────────────────┐
-   │  discuss the work · /modes plan fences writes to markdown         │
-   │  research, resolve decisions, agree the shape   (no verb, no UI)   │
-   └────────────────────────────────┬──────────────────────────────────┘
-                                    │
-                                    ▼
-                        2. /plans write [name]
-                                    │  authors
-                                    ▼
-                          ┌──────────────────┐
-              ┌──────────▶│   *.plan.md      │◀────────────┐
-              │           └────────┬─────────┘             │
-              │                    │                       │
-              │        ┌───────────┴───────────┐           │ corrected plan
-              │        ▼                       ▼           │
-              │  3. /plans review        4. /plans verify  │
-              │     (quality: rails,        (truth: each   │
-              │      staleness, risk,        todo's status │
-              │      hygiene, lint)          vs. reality)  │
-              │        │                       │           │
-              │        └───────────┬───────────┘           │
-              │                    ▼                       │
-              │            <plan>.review.md                │
-              │            <plan>.verify.md                │
-              │             (report card)                  │
-              │                    │                       │
-              │                    ▼                       │
-              │        5. /plans update {plan} {report} ───┘
-              │           (broad latitude from a review;
-              │            status-only from a verify)
-              │
-              │                    │  when the plan is ready
-              │                    ▼
-              │          6. /plans build [plan] [model]
-              └───────────  execute IN PLACE, flipping todos live:
-                  reality ≠   pending → in_progress → completed
-                  plan?       (bails → cancelled + a why note)
-                  STOP &                │
-                  surface               │  all todos terminal
-                                        ▼
-                            7. /plans archive [dir] [archiveDir]
-                               sweep the plan + its reports into
-                               archiveDir (copy-verify-delete)
+  0. COLLABORATE - the unofficial phase: no verb, no dialog
+     talk the work through (typically inside /modes plan, which
+     fences writes to markdown): research, resolve every decision,
+     agree the shape. Nothing is authored yet.
+        │
+        ▼
+  1. /plans write [name]
+     author the agreed plan  ->  *.plan.md
+        │
+        ▼
+  2. /plans review {plan} [out] [model]
+     the plan's QUALITY as written: rails, stale refs, risk,
+     hygiene, lint  ->  <plan>.review.md
+        │
+        ▼
+  3. /plans update {plan} {report}
+     broad latitude - restructure the plan freely
+        │
+        ▼
+  4. /plans build [plan] [model]  ◀────────────────┐
+     execute IN PLACE, flipping todos live:        │
+     pending -> in_progress -> completed           │
+     reality != plan?  STOP and surface            │
+        │                                          │
+        ▼                                          │
+  5. /plans verify {plan} [out] [model]            │
+     status vs. REALITY: is each "completed"       │
+     todo ACTUALLY done? -> <plan>.verify.md       │
+        │                                          │
+        ├───────────────┐                          │
+        │               ▼                          │
+        │             6. [/plans update] if needed │
+        │                narrow - status flips only│
+        │               │                          │
+        │               ▼                          │
+        │             7. [/plans build]  if needed │
+        │                finish the gaps ──────────┘
+        │
+        │  every todo terminal and true
+        ▼
+  8. /plans archive [dir] [archiveDir] [lenient]
+     sweep the finished plan + its sibling reports into archiveDir
+     (copy-verify-delete, never a bare move)
 ```
 
-Reading the loop in one line: **collaborate → write → review / verify → update →
-build → archive**, with `review`/`verify` producing a report card that only `update`
-consumes, and the `update → review` arrow available as many times as the plan needs.
+Reading the loop in one line: **collaborate → write → review → update → build →
+verify → [update → build if needed] → archive when terminal**. `review` and `verify`
+are the only producers of a report card and `update` is its only consumer, so each
+grading pass costs one `update` to apply.
 
 ## Install
 

@@ -577,7 +577,7 @@ When the user runs `/plans` with a blank or unrecognized verb (or asks "what can
 do?"), reply with exactly this — no preamble, no postscript:
 
 ```text
-/plans · v0.0.2 — lifecycle verbs for *.plan.md files:
+/plans · v0.0.3 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
