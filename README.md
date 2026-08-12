@@ -42,23 +42,23 @@ re-enter any phase at any time.
                                     │  authors
                                     ▼
                           ┌──────────────────┐
-              ┌──────────▶│   *.plan.md      │◀──────────┐
-              │           └────────┬─────────┘           │
-              │                    │                      │
-              │        ┌───────────┴───────────┐          │ corrected plan
-              │        ▼                       ▼          │
+              ┌──────────▶│   *.plan.md      │◀────────────┐
+              │           └────────┬─────────┘             │
+              │                    │                       │
+              │        ┌───────────┴───────────┐           │ corrected plan
+              │        ▼                       ▼           │
               │  3. /plans review        4. /plans verify  │
               │     (quality: rails,        (truth: each   │
               │      staleness, risk,        todo's status │
               │      hygiene, lint)          vs. reality)  │
-              │        │                       │          │
-              │        └───────────┬───────────┘          │
-              │                    ▼                      │
-              │            <plan>.review.md               │
-              │            <plan>.verify.md               │
-              │             (report card)                 │
-              │                    │                      │
-              │                    ▼                      │
+              │        │                       │           │
+              │        └───────────┬───────────┘           │
+              │                    ▼                       │
+              │            <plan>.review.md                │
+              │            <plan>.verify.md                │
+              │             (report card)                  │
+              │                    │                       │
+              │                    ▼                       │
               │        5. /plans update {plan} {report} ───┘
               │           (broad latitude from a review;
               │            status-only from a verify)
