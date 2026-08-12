@@ -23,6 +23,64 @@ Invocation signatures are unchanged from the skills' standalone ancestors; only 
 plugin prefix is new (`ccvi-skills:modes`, `ccvi-skills:plans`,
 `ccvi-skills:seedprompt`).
 
+## The /plans lifecycle
+
+Phase 1 is **collaborate** - the unofficial one: no verb, no dialog. You and the agent
+talk the work through (typically in `/modes plan`, which fences writes to markdown)
+until the shape is agreed. Every phase after it is an explicit verb, and the verbs are
+**independent atoms**: nothing auto-runs the next one, so you compose the loop and can
+re-enter any phase at any time.
+
+```diagram
+   ┌── 1. COLLABORATE ─────────────────────────────────────────────────┐
+   │  discuss the work · /modes plan fences writes to markdown         │
+   │  research, resolve decisions, agree the shape   (no verb, no UI)   │
+   └────────────────────────────────┬──────────────────────────────────┘
+                                    │
+                                    ▼
+                        2. /plans write [name]
+                                    │  authors
+                                    ▼
+                          ┌──────────────────┐
+              ┌──────────▶│   *.plan.md      │◀──────────┐
+              │           └────────┬─────────┘           │
+              │                    │                      │
+              │        ┌───────────┴───────────┐          │ corrected plan
+              │        ▼                       ▼          │
+              │  3. /plans review        4. /plans verify  │
+              │     (quality: rails,        (truth: each   │
+              │      staleness, risk,        todo's status │
+              │      hygiene, lint)          vs. reality)  │
+              │        │                       │          │
+              │        └───────────┬───────────┘          │
+              │                    ▼                      │
+              │            <plan>.review.md               │
+              │            <plan>.verify.md               │
+              │             (report card)                 │
+              │                    │                      │
+              │                    ▼                      │
+              │        5. /plans update {plan} {report} ───┘
+              │           (broad latitude from a review;
+              │            status-only from a verify)
+              │
+              │                    │  when the plan is ready
+              │                    ▼
+              │          6. /plans build [plan] [model]
+              └───────────  execute IN PLACE, flipping todos live:
+                  reality ≠   pending → in_progress → completed
+                  plan?       (bails → cancelled + a why note)
+                  STOP &                │
+                  surface               │  all todos terminal
+                                        ▼
+                            7. /plans archive [dir] [archiveDir]
+                               sweep the plan + its reports into
+                               archiveDir (copy-verify-delete)
+```
+
+Reading the loop in one line: **collaborate → write → review / verify → update →
+build → archive**, with `review`/`verify` producing a report card that only `update`
+consumes, and the `update → review` arrow available as many times as the plan needs.
+
 ## Install
 
 End users do not install this by hand - **CCVI installs the plugin automatically**.
