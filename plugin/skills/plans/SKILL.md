@@ -574,10 +574,13 @@ after the match; sweep the sibling reports the same way; report the same punch l
 ## Help output
 
 When the user runs `/plans` with a blank or unrecognized verb (or asks "what can /plans
-do?"), reply with exactly this — no preamble, no postscript:
+do?"), reply with exactly this — the signature list AND the lifecycle diagram beneath it
+— no preamble, no postscript. The diagram's column alignment is load-bearing: emit it
+verbatim, never reflowed (it is byte-identical to the one in the repo README, and
+`build.py --check` enforces that):
 
-```text
-/plans · v0.0.3 — lifecycle verbs for *.plan.md files:
+```diagram
+/plans · v0.0.4 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
@@ -586,6 +589,51 @@ do?"), reply with exactly this — no preamble, no postscript:
 • archive [dir] [archiveDir] [lenient]             — sweep finished plans (todos all terminal) into archiveDir
 
 Verbs are independent — you compose them. write authors; review/verify produce a report; update consumes one.
+The lifecycle, in order — review is the PRE-build gate, verify the POST-build audit:
+
+  0. COLLABORATE - the unofficial phase: no verb, no dialog
+     talk the work through (typically inside /modes plan, which
+     fences writes to markdown): research, resolve every decision,
+     agree the shape. Nothing is authored yet.
+        │
+        ▼
+  1. /plans write [name]
+     author the agreed plan  ->  *.plan.md
+        │
+        ▼
+  2. /plans review {plan} [out] [model]
+     the plan's QUALITY as written: rails, stale refs, risk,
+     hygiene, lint  ->  <plan>.review.md
+        │
+        ▼
+  3. /plans update {plan} {report}
+     broad latitude - restructure the plan freely
+        │
+        ▼
+  4. /plans build [plan] [model]  ◀────────────────┐
+     execute IN PLACE, flipping todos live:        │
+     pending -> in_progress -> completed           │
+     reality != plan?  STOP and surface            │
+        │                                          │
+        ▼                                          │
+  5. /plans verify {plan} [out] [model]            │
+     status vs. REALITY: is each "completed"       │
+     todo ACTUALLY done? -> <plan>.verify.md       │
+        │                                          │
+        ├───────────────┐                          │
+        │               ▼                          │
+        │             6. [/plans update] if needed │
+        │                narrow - status flips only│
+        │               │                          │
+        │               ▼                          │
+        │             7. [/plans build]  if needed │
+        │                finish the gaps ──────────┘
+        │
+        │  every todo terminal and true
+        ▼
+  8. /plans archive [dir] [archiveDir] [lenient]
+     sweep the finished plan + its sibling reports into archiveDir
+     (copy-verify-delete, never a bare move)
 ```
 
 ## When tools are denied

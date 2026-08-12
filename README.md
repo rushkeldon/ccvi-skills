@@ -9,7 +9,7 @@ tightly-coupled Claude Code skills - `modes`, `plans`, and `seedprompt` - shippe
 > enforcement hook, the `<ccvi-modes>` sentinel, the Plan Editor, the seedprompt
 > rollover relay), and each skill assumes its siblings are installed.
 
-Current version: ccvi-skills · v0.0.3
+Current version: ccvi-skills · v0.0.4
 
 ## The skills
 

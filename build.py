@@ -264,6 +264,32 @@ def manifest_current(version):
     return fh.read() == manifest_bytes(version)
 
 
+def _readme_diagram():
+  """The lines between README.md's ```diagram fence and its closer."""
+  lines = _read(README).split("\n")
+  s = next(i for i, l in enumerate(lines) if l.startswith("```diagram"))
+  e = next(i for i, l in enumerate(lines[s + 1:], s + 1) if l.startswith("```"))
+  return "\n".join(lines[s + 1:e])
+
+
+def diagram_drift():
+  """The /plans lifecycle diagram lives in two places on purpose: the README (for
+  humans browsing the repo) and the /plans help output (for users who type the bare
+  verb). They must be byte-identical, or one silently teaches the wrong lifecycle.
+  Returns a list of problem strings."""
+  if not os.path.isfile(README):
+    return []
+  try:
+    diagram = _readme_diagram()
+  except StopIteration:
+    return ["README.md has no ```diagram block - the /plans lifecycle diagram is missing"]
+  help_md = _read(p("plugin", "skills", "plans", "SKILL.md"))
+  if diagram not in help_md:
+    return ["the /plans help-output diagram has drifted from README.md's "
+            "(they must be byte-identical)"]
+  return []
+
+
 def manifest_drift():
   """Cheap tripwire: every plans/seedprompt/modes verb named in the manifest must
   appear as `/<skill> <verb>` (or a directive-table row) in its SKILL.md prose.
@@ -296,6 +322,7 @@ def do_check():
   if not manifest_current(version):
     problems.append("manifest.json is stale or missing - run python3 build.py")
   problems.extend(manifest_drift())
+  problems.extend(diagram_drift())
   if not zip_current(version):
     problems.append("ccvi-skills.zip is stale or missing - run python3 build.py")
   if problems:
@@ -309,9 +336,9 @@ def do_check():
 
 def do_build():
   version = canon_version()
-  drift = manifest_drift()
+  drift = manifest_drift() + diagram_drift()
   if drift:
-    print("build FAIL — manifest out of sync with SKILL.md prose:")
+    print("build FAIL — source out of sync:")
     for pr in drift:
       print("  - " + pr)
     return 1

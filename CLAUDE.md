@@ -106,6 +106,15 @@ The user typing `BBP` (any casing) is a direct order to run the ritual now.
   alignment-critical blocks. The two LAW fences are the only sanctioned bare fences.
 - **Plan workflow:** author plans into `doc/` (`*.plan.md`), archive finished ones
   into `doc/archive/` (`/plans archive doc`).
+- **The /plans lifecycle diagram lives in two places and must stay byte-identical:**
+  the README's ` ```diagram ` block and the `/plans` help output in
+  `plugin/skills/plans/SKILL.md`. Edit one, copy it to the other in the same commit -
+  `build.py --check` fails on drift. The lifecycle it documents is
+  collaborate → write → review → update → build → verify → [update → build if needed]
+  → archive; note that `review` is the PRE-build gate and `verify` the POST-build
+  audit. The `verbs:` frontmatter `order:` keys are a host MENU order (a logical verb
+  catalog), deliberately NOT this execution order - do not "fix" one to match the
+  other.
 - **`../skills-anthropic` is a frozen quarry** - read-only reference; never write to
   it, and never re-import its multi-surface machinery.
 - Commits and pushes happen through the **BBP** ritual (see above) at the end of a
