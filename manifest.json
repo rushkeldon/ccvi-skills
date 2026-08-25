@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "skills": [
     {
       "name": "modes",
@@ -209,6 +209,191 @@
         {
           "name": "clear",
           "params": []
+        }
+      ]
+    },
+    {
+      "name": "cleancode",
+      "invocation": "/cleancode [noun] [verb] [args]",
+      "verbs": [
+        {
+          "name": "comments escrow",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "escrowDir",
+              "required": false,
+              "kind": "dir",
+              "default": "./comment_escrow/"
+            }
+          ]
+        },
+        {
+          "name": "comments strip",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "escrowDir",
+              "required": false,
+              "kind": "dir",
+              "default": "./comment_escrow/"
+            }
+          ]
+        },
+        {
+          "name": "comments annotate",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "escrowDir",
+              "required": false,
+              "kind": "dir",
+              "default": "./comment_escrow/"
+            }
+          ]
+        },
+        {
+          "name": "naming refactor",
+          "params": [
+            {
+              "name": "symbol",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "newName",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "path",
+              "required": false,
+              "kind": "dir"
+            },
+            {
+              "name": "tier",
+              "required": false,
+              "kind": "freeform",
+              "default": "internal"
+            }
+          ]
+        },
+        {
+          "name": "naming propose",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "tier",
+              "required": false,
+              "kind": "freeform",
+              "default": "internal"
+            }
+          ]
+        },
+        {
+          "name": "naming apply",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "tier",
+              "required": false,
+              "kind": "freeform",
+              "default": "internal"
+            },
+            {
+              "name": "proposals",
+              "required": false,
+              "kind": "file"
+            }
+          ]
+        },
+        {
+          "name": "conventions export",
+          "params": [
+            {
+              "name": "topic",
+              "required": false,
+              "kind": "freeform",
+              "default": "all"
+            },
+            {
+              "name": "pathAndFileName",
+              "required": false,
+              "kind": "file"
+            }
+          ]
+        },
+        {
+          "name": "conventions import",
+          "params": [
+            {
+              "name": "pathAndFileName",
+              "required": false,
+              "kind": "file"
+            }
+          ]
+        },
+        {
+          "name": "conventions generate",
+          "params": [
+            {
+              "name": "strategy",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "pathAndFileName",
+              "required": false,
+              "kind": "file"
+            }
+          ]
+        },
+        {
+          "name": "run",
+          "params": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "verdict",
+              "required": false,
+              "kind": "freeform"
+            },
+            {
+              "name": "escrowDir",
+              "required": false,
+              "kind": "dir",
+              "default": "./comment_escrow/"
+            },
+            {
+              "name": "tier",
+              "required": false,
+              "kind": "freeform",
+              "default": "internal"
+            }
+          ]
         }
       ]
     }

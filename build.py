@@ -2,13 +2,14 @@
 """
 build.py - the release build for the ccvi-skills suite.
 
-One plugin, three skills, one version. The canonical version lives in
+One plugin, four skills, one version. The canonical version lives in
 plugin/.claude-plugin/plugin.json; this script stamps it everywhere it is
 displayed and packages the one zip artifact:
 
   1. read the canonical version from plugin/.claude-plugin/plugin.json
-  2. STAMP it into every version display - the help headers of the three skills
-     (modes SKILL.md + scripts/modes.py, plans SKILL.md, seedprompt SKILL.md).
+  2. STAMP it into every version display - the help headers of the four skills
+     (modes SKILL.md + scripts/modes.py, plans SKILL.md, seedprompt SKILL.md,
+     cleancode SKILL.md).
      A real version string is replaced in place; there is no {{placeholder}}
      token, so the source always reads as a valid, if occasionally stale, file.
   3. update the "ccvi-skills · vN.N.N" display in README.md (skipped with a
@@ -61,6 +62,8 @@ STAMPS = [
    re.compile(r"/plans · v\d+\.\d+\.\d+"), "/plans · v{v}"),
   (p("plugin", "skills", "seedprompt", "SKILL.md"),
    re.compile(r"/seedprompt · v\d+\.\d+\.\d+"), "/seedprompt · v{v}"),
+  (p("plugin", "skills", "cleancode", "SKILL.md"),
+   re.compile(r"/cleancode · v\d+\.\d+\.\d+"), "/cleancode · v{v}"),
 ]
 
 README = p("README.md")
@@ -132,6 +135,49 @@ MANIFEST_SKILLS = [
       {"name": "write", "params": [_param("body", False, "freeform")]},
       {"name": "show", "params": []},
       {"name": "clear", "params": []},
+    ],
+  },
+  {
+    # cleancode's verbs are noun-first TWO-WORD strings ("comments escrow") - the
+    # verb name includes the space. Consumers that split on whitespace must treat
+    # the name as opaque.
+    "name": "cleancode",
+    "invocation": "/cleancode [noun] [verb] [args]",
+    "verbs": [
+      {"name": "comments escrow",
+       "params": [_param("path", True, "dir"),
+                  _param("escrowDir", False, "dir", "./comment_escrow/")]},
+      {"name": "comments strip",
+       "params": [_param("path", True, "dir"),
+                  _param("escrowDir", False, "dir", "./comment_escrow/")]},
+      {"name": "comments annotate",
+       "params": [_param("path", True, "dir"),
+                  _param("escrowDir", False, "dir", "./comment_escrow/")]},
+      {"name": "naming refactor",
+       "params": [_param("symbol", True, "freeform"),
+                  _param("newName", True, "freeform"),
+                  _param("path", False, "dir"),
+                  _param("tier", False, "freeform", "internal")]},
+      {"name": "naming propose",
+       "params": [_param("path", True, "dir"),
+                  _param("tier", False, "freeform", "internal")]},
+      {"name": "naming apply",
+       "params": [_param("path", True, "dir"),
+                  _param("tier", False, "freeform", "internal"),
+                  _param("proposals", False, "file")]},
+      {"name": "conventions export",
+       "params": [_param("topic", False, "freeform", "all"),
+                  _param("pathAndFileName", False, "file")]},
+      {"name": "conventions import",
+       "params": [_param("pathAndFileName", False, "file")]},
+      {"name": "conventions generate",
+       "params": [_param("strategy", True, "freeform"),
+                  _param("pathAndFileName", False, "file")]},
+      {"name": "run",
+       "params": [_param("path", True, "dir"),
+                  _param("verdict", False, "freeform"),
+                  _param("escrowDir", False, "dir", "./comment_escrow/"),
+                  _param("tier", False, "freeform", "internal")]},
     ],
   },
 ]

@@ -580,7 +580,7 @@ verbatim, never reflowed (it is byte-identical to the one in the repo README, an
 `build.py --check` enforces that):
 
 ```diagram
-/plans · v0.0.4 — lifecycle verbs for *.plan.md files:
+/plans · v0.0.5 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
