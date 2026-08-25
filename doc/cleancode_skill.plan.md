@@ -66,7 +66,7 @@ todos:
     phase: finish
   - id: dogfood-run
     content: "Dogfood /cleancode run on one stabilized module chosen with Keldon; review the diff and escrow together and fold findings back into SKILL.md"
-    status: in_progress
+    status: pending
     phase: finish
 isProject: false
 updates:
@@ -698,6 +698,11 @@ judgment work.
     the escrow together; fold every rough edge back into SKILL.md / `comments.py`. *Done
     when:* the run completes with a green final verdict, Keldon signs off on the diff,
     and any fixes discovered are landed.
+
+    *Build note (2026-08-25):* the invocability prerequisite is DONE — v0.0.5 built,
+    pushed, and the installed plugin at `~/.ccvi/ccvi-skills/plugin/` refreshed with
+    cleancode included. The dogfood session itself awaits Keldon: pick the module,
+    run the cautious path, review together.
 
 **Escape hatch (binding on every step):** if reality diverges from this plan — the
 skills-repo layout differs, a language's tokenization turns out infeasible in the script,
