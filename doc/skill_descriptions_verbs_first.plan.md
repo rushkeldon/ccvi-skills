@@ -26,7 +26,7 @@ todos:
     phase: read-verb
   - id: verify-and-release
     content: "Run build.py --check, test_modes.py, test_comments.py all green; BBP (bump/build/push); refresh the installed plugin at ~/.ccvi/ccvi-skills/plugin/ including manifest.json at its root"
-    status: in_progress
+    status: completed
     phase: finish
 isProject: false
 ---
