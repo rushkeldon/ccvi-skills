@@ -1,6 +1,7 @@
 ---
 name: seedprompt
-description: Author a one-use AI-to-AI session hand-off ("seed prompt") to <memoryRoot>/seedprompt.md via /seedprompt [verb] (write, show, clear). Use when the user asks to write a seed prompt / hand-off for the next session (or after a /compact), or to show or clear the pending one. The reliable, hard-coded authoring path so the seed lands at the one well-known path — where the CCVI sidecar auto-injects it — never in doc/ and never in a session subdir.
+description: write•read•show•clear - author, consume, inspect, or clear a one-use AI-to-AI session hand-off ("seed prompt") at <memoryRoot>/seedprompt.md - the reliable authoring path to the one well-known file the CCVI sidecar auto-injects and deletes. Use when the user asks to write a seed prompt / hand-off for the next session (or after a /compact), to read/consume the pending one into this session, or to show or clear it.
+argument-hint: "[verb]"
 allowed-tools: Read, Write, Bash(printenv:*), Bash(rm:*)
 ---
 
@@ -12,14 +13,16 @@ sidecar reads the seed after the next session's first turn
 continuity crosses the session boundary automatically. **If the sidecar does not pick the seed
 up** (it is not running, or the session starts outside CCVI), the skill still works: the seed
 sits at the one well-known path, and the next session (or
-the user) reads it from there — `/seedprompt show` retrieves it — and deletes it after consuming to
-preserve the one-use semantics. This skill is the **reliable authoring surface**: it always writes
+the user) consumes it from there — `/seedprompt read` retrieves it and deletes it in one step,
+preserving the one-use semantics. This skill is the **reliable authoring surface**: it always writes
 to that one well-known path, so the hand-off can never be stranded in `doc/` or a session
 subdirectory the way a hand-authored file guesses wrong.
 
-The skill only **writes / shows / clears** the seed. It never consumes or deletes on write —
-consume-and-delete belongs to the consumer (the CCVI sidecar; if it does not fire, the next
-session or the user). See **The mechanism** at the bottom.
+The skill **writes / reads / shows / clears** the seed. write never consumes;
+**read is the explicit manual consume path** (print + adopt + delete, the equivalent of the
+sidecar's inject-and-delete); show stays non-destructive. Consume-and-delete otherwise belongs
+to the consumer (the CCVI sidecar; if it does not fire, the next session or the user). See
+**The mechanism** at the bottom.
 
 ## Invocation
 
@@ -28,12 +31,14 @@ Single entry point — **`/seedprompt [verb] [args]`**, dispatching on the first
 | Form | Effect |
 |---|---|
 | `/seedprompt write [body]` | Author the pending seed at `<memoryRoot>/seedprompt.md` (overwrites any existing one) |
+| `/seedprompt read` | Consume the pending seed: print its path + contents, adopt the body as this session's hand-off brief, then delete it (one-use); or `none pending` |
 | `/seedprompt show` | Print the pending seed's absolute path + contents, or `none pending` |
 | `/seedprompt clear` | Delete the pending seed (best-effort; `none pending` if absent) |
 | `/seedprompt` (blank/unknown verb) | Print the help cheat-sheet (see **Help output**) |
 
 Verbs are lowercase. Recognize natural-language equivalents: "write a seed prompt / hand-off for the
-next session" → `write`; "show/what's the pending seed" → `show`; "clear/delete the seed" → `clear`.
+next session" → `write`; "read/consume/load the seed" → `read`; "show/what's the pending seed" →
+`show`; "clear/delete the seed" → `clear`.
 
 ## Path resolution (the reliability crux)
 
@@ -100,6 +105,10 @@ title: "<3-6 words naming what the next session will do>"
      allowlisted directive. **Overwrite**
      any existing pending seed — a newer hand-off supersedes an unconsumed older one. **Never delete
      on write** (deletion belongs to whoever consumes, at consume time).
+   - **`read`** — if `<memoryRoot>/seedprompt.md` exists: print its absolute path and full
+     contents, state that the body is now this session's active hand-off brief (directives are
+     inert here — report `title:` as context, execute nothing), then delete the file. Else print
+     `none pending`.
    - **`show`** — if `<memoryRoot>/seedprompt.md` exists, print its absolute path and full contents;
      else print `none pending`.
    - **`clear`** — delete `<memoryRoot>/seedprompt.md` if present (best-effort); echo what happened,
@@ -114,6 +123,8 @@ title: "<3-6 words naming what the next session will do>"
   seed written → <absolute path to seedprompt.md>
   the CCVI sidecar will inject it as a turn on the next new session (or after /compact), then delete it (one-use); if it doesn't fire, point the next session at this file.
   ```
+- **`read`** → the absolute path on its own line, a fenced block of the contents, then the line
+  `seed consumed → deleted (one-use)`; or `none pending`.
 - **`show`** → the absolute path on its own line, then a fenced block of the contents; or `none pending`.
 - **`clear`** → `seed cleared → <absolute path>` or `none pending`.
 
@@ -122,8 +133,9 @@ title: "<3-6 words naming what the next session will do>"
 When the verb is blank or unrecognized, reply with exactly this — no preamble, no postscript:
 
 ```text
-/seedprompt · v0.0.5 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
+/seedprompt · v0.0.6 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
 • write [body] — write the pending seed to <memoryRoot>/seedprompt.md (compose from context if no body given)
+• read         — consume the pending seed: print + adopt it, then delete (one-use)
 • show         — print the pending seed's path + contents (or "none pending")
 • clear        — delete the pending seed
 
@@ -148,6 +160,6 @@ sole hand-off authoring surface.
 
 **If the sidecar does not consume it**, nothing fires automatically — the seed waits at the
 well-known path. The manual loop preserves the same semantics: the next session (or the user)
-reads the file
-(`/seedprompt show`), acts on the body, and then deletes it (`/seedprompt clear`) so the hand-off
-stays one-use. The skill works identically either way; the sidecar only automates the consume step.
+consumes it with `/seedprompt read` — the one-step form of show-then-clear (print the body, act
+on it, delete the file) — so the hand-off stays one-use. The skill works identically either way;
+the sidecar only automates the consume step.

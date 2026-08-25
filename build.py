@@ -133,6 +133,7 @@ MANIFEST_SKILLS = [
     "invocation": "/seedprompt [verb] [args]",
     "verbs": [
       {"name": "write", "params": [_param("body", False, "freeform")]},
+      {"name": "read", "params": []},
       {"name": "show", "params": []},
       {"name": "clear", "params": []},
     ],

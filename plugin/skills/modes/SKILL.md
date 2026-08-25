@@ -1,6 +1,7 @@
 ---
 name: modes
-description: Manage persistent response modes via /modes [verb] directives (e.g. /modes plan ./doc, /modes agent, /modes exit sbs, /modes list, /modes clear). Use when the user issues a /modes directive, or asks in natural language to enter, exit, list, clear, or check any response mode.
+description: plan•agent•agent-loop•one-word•sbs•exclude•include•exit•list•clear - manage persistent response modes via /modes [verb] directives. Use when the user issues a /modes directive, or asks in natural language to enter, exit, list, clear, or check any response mode.
+argument-hint: "[verb] [param]"
 allowed-tools: Read, Write, Edit, Bash(python3:*), Bash(printenv:*)
 ---
 
@@ -527,7 +528,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.5:
+Modes · v0.0.6:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent

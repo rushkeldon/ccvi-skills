@@ -1,6 +1,7 @@
 ---
 name: cleancode
-description: Post-stabilization code consolidation via /cleancode [noun] [verb] — comments escrow/strip/annotate (escrow then delete construction-era comments, re-comment to a high bar), naming refactor/propose/apply (rename per the co-authored naming conventions), conventions export/import/generate (the conventions docs loop), and run (the full pipeline). Use when the user issues a /cleancode directive; only on a stabilized project with a green verdict.
+description: comments escrow/strip/annotate•naming refactor/propose/apply•conventions export/import/generate•run - post-stabilization code consolidation; escrow then strip construction-era comments, rename per the co-authored naming conventions, re-comment to a high bar, conventions docs loop, full pipeline. Use when the user issues a /cleancode directive; only on a stabilized project with a green verdict.
+argument-hint: "[noun] [verb] [args]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
@@ -647,7 +648,7 @@ When the user runs `/cleancode` with a blank or unrecognized verb (or asks "what
 /cleancode do?"), reply with exactly this — no preamble, no postscript:
 
 ```text
-/cleancode · v0.0.5 — post-stabilization code consolidation. Run ONLY when a version is done, tested, and green — invoking a destructive verb IS the stabilization declaration:
+/cleancode · v0.0.6 — post-stabilization code consolidation. Run ONLY when a version is done, tested, and green — invoking a destructive verb IS the stabilization declaration:
 comments — the escrow pipeline
 • comments escrow   {path} [escrowDir]              — copy every comment into the escrow + manifest; report the census
 • comments strip    {path} [escrowDir]              — delete non-protected comments; refuses without a fresh escrow

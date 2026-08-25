@@ -1,6 +1,7 @@
 ---
 name: plans
-description: Plan lifecycle verbs via /plans [verb] — write (author a plan), review (vet quality), verify (audit todo-status vs reality), update (apply a review/verify report), build (execute in place, flip todos live), archive (sweep finished plans into an archive dir). Use when the user issues a /plans directive or asks to author, review, verify, update, build, or archive a *.plan.md.
+description: write•review•verify•update•build•archive - lifecycle verbs for Cursor-compatible *.plan.md files via /plans [verb]. Use when the user issues a /plans directive or asks to author, review, verify, update, build, or archive a *.plan.md.
+argument-hint: "[verb] [args]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
 # for the model; this block MIRRORS it for a host (e.g. CCVI's plan-phase picker) that
@@ -580,7 +581,7 @@ verbatim, never reflowed (it is byte-identical to the one in the repo README, an
 `build.py --check` enforces that):
 
 ```diagram
-/plans · v0.0.5 — lifecycle verbs for *.plan.md files:
+/plans · v0.0.6 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
