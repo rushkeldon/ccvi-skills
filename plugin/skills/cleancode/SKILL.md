@@ -648,7 +648,7 @@ When the user runs `/cleancode` with a blank or unrecognized verb (or asks "what
 /cleancode do?"), reply with exactly this — no preamble, no postscript:
 
 ```text
-/cleancode · v0.0.6 — post-stabilization code consolidation. Run ONLY when a version is done, tested, and green — invoking a destructive verb IS the stabilization declaration:
+/cleancode · v0.0.7 — post-stabilization code consolidation. Run ONLY when a version is done, tested, and green — invoking a destructive verb IS the stabilization declaration:
 comments — the escrow pipeline
 • comments escrow   {path} [escrowDir]              — copy every comment into the escrow + manifest; report the census
 • comments strip    {path} [escrowDir]              — delete non-protected comments; refuses without a fresh escrow

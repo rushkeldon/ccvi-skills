@@ -285,10 +285,17 @@ def main():
     check("aloop/law-resource-gates", "gate exclusive resources" in LAW_AL)
     check("aloop/law-write-dont-build", "leave it UNBUILT" in LAW_AL)
     check("aloop/law-rollover-drain", "drain in-flight work first" in LAW_AL)
+    check("aloop/law-log-ladder", "<ccvi-autonomy-log>" in LAW_AL)
+    check("aloop/law-log-fallback", "<docDir>/logs/autonomy" in LAW_AL)
+    check("aloop/law-log-hands-off-git", "NEVER a .gitignore edit" in LAW_AL)
     # the machine-grabbing bookends bullet was cut with no trace
     for gone in ("Stop/Start bookends", "desktop hide", "machine-grabbing"):
         check("aloop/law-cut[{}]".format(gone), gone not in LAW_AL,
               "removed bookends text still present")
+    # the project-root log destination was replaced by the resolution ladder
+    for gone in ("at the project root",):
+        check("aloop/law-cut[{}]".format(gone), gone not in LAW_AL,
+              "old project-root log destination still present")
     check("aloop/notes-dormant", "DORMANT" in n, "dormant-entry clause missing from notes")
     check("aloop/encode", "Predict what active_modes.md" in n and "DERIVE" in n, "encode prompt missing")
     # mutex displacement both ways

@@ -187,7 +187,7 @@ The autonomous keep-moving flywheel. The mode is a **two-state contract**: enter
 • never cron for the heartbeat — scheduled cloud agents and new-instance spawners are NOT wake sources: they spawn fresh sessions with fresh context, defeating the same-session point of the loop; the heartbeat is an in-session wakeup armed behind in-flight work, or nothing
 • every wakeup carries this mode's own re-entry text as its prompt, never a generic sentinel — a host's default wakeup framing is conservative ("steward; when quiet, stop"), and as the LAST instruction read on wake it out-competes this law by recency; arm with the loop's re-entry brief instead: re-enter agent-loop, reconstruct from the plan statuses and the log tail, re-establish the invariant, continue from the NEXT line
 • report execution state truthfully — "stopped, nothing will wake me" is a sentence to WRITE, never a state to conceal; a turn ending on a wait names what is running, its expected duration, and what wakes it; turn summaries lead with what happened and never promise work the turn didn't do; a milestone summary is not a stopping point — summarize, then keep working or arm in the same turn
-• decide-log-continue — make the best call under the project's stated guidance (specs, plans, conventions; absent those, the most defensible reading of intent), log decision + rationale + the NEXT unit, and keep going; the log is this engagement's autonomy_log_<session>_<NN>.md at the project root (fresh file per engagement, materialized on first entry, seeded with a ≤10-line digest of the newest predecessor's tail) or wherever the project already keeps its log, with each new entry echoed in the turn's report — where no writable project exists, the echoed entry itself is the log; a wrong-but-logged call beats a stalled session, and entering this mode accepts that rollback risk; cost and effort forecasts are NEVER a reason to stop, shrink, or ask — your forecasts run in human-engineer units and are reliably wrong; when a fork's recommended option is "keep going", TAKE it
+• decide-log-continue — make the best call under the project's stated guidance (specs, plans, conventions; absent those, the most defensible reading of intent), log decision + rationale + the NEXT unit, and keep going; the log is this engagement's autonomy_log_<session>_<NN>.md in the RESOLVED log directory — first hit of: a host <ccvi-autonomy-log> sentinel, an `Autonomy logs:` line in CLAUDE.md, the directory an existing autonomy_log_* already sits in, else <docDir>/logs/autonomy — resolved ONCE at the first log write, its path named in that turn's report, and NEVER a .gitignore edit (the log is written, never hidden; ignoring it is the user's call) (fresh file per engagement, materialized on first entry, seeded with a ≤10-line digest of the newest predecessor's tail), with each new entry echoed in the turn's report — where no writable project exists, the echoed entry itself is the log; a wrong-but-logged call beats a stalled session, and entering this mode accepts that rollback risk; cost and effort forecasts are NEVER a reason to stop, shrink, or ask — your forecasts run in human-engineer units and are reliably wrong; when a fork's recommended option is "keep going", TAKE it
 • stop-and-ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance genuinely cannot arbitrate; destructive actions; real-world money (purchases, paid services — NOT token/compute spend, which entering the mode accepts) — everything else is decide-log-continue
 • every worker brief draws its fence — it names what the worker owns (its unit, its files) and what it must never touch: the plan file, the autonomy log, and other units' files; a worker commits only its own named pathspec or nothing at all — NEVER add-all, which sweeps racing siblings' edits and the orchestrator's flips into its commit; the worker's model and effort ride in the brief per the model-economy bullet
 • gate exclusive resources — a resource only one worker can safely hold (a heavy build slot, a port, a device or display, a shared fixture) gets AT MOST ONE holder at a time; a spawn moment with the slot taken hands the new worker non-conflicting work (docs, plans, read-only analysis) instead of a queue position or a double-booking — the invariant's "as many as the work supports" means exactly this
@@ -199,7 +199,44 @@ If work remains and you are about to end a turn without work in flight and a wak
 ```
 <!-- /LAW:agent-loop -->
 
-**The autonomy log (the decide-log-continue destination).** One log file per engagement: a fresh (non-idempotent) agent-loop engagement reserves `<projectRoot>/autonomy_log_<sessionID>_<NN>.md` (full session UUID; `NN` zero-padded so lexical sort is chronological; no session id resolvable → a UTC stamp slug instead). The file materializes on the first log entry — a dormant entry that never gets work leaves nothing — and an idempotent re-entry never bumps the index. Entries are append-only and dated; each names the binding NEXT unit; each is echoed in the turn's report as it is written. The first entry of a new file is a ≤10-line digest read from the newest predecessor's TAIL (open threads, standing decisions still in force, the NEXT line) — never a full-file read, so no session ever reads more than one predecessor's tail. The live log is the current session's highest index; discovery is a glob of `autonomy_log_*` at the project root; version control is the deep archive. Projects that already keep an autonomy log elsewhere keep using it — never create a second log beside an established one.
+**The autonomy log (the decide-log-continue destination).** One log file per engagement: a fresh (non-idempotent) agent-loop engagement reserves `<logDir>/autonomy_log_<sessionID>_<NN>.md` (full session UUID; `NN` zero-padded so lexical sort is chronological; no session id resolvable → a UTC stamp slug instead). The file materializes on the first log entry — a dormant entry that never gets work leaves nothing — and an idempotent re-entry never bumps the index. Entries are append-only and dated; each names the binding NEXT unit; each is echoed in the turn's report as it is written. The first entry of a new file is a ≤10-line digest read from the newest predecessor's TAIL (open threads, standing decisions still in force, the NEXT line) — never a full-file read, so no session ever reads more than one predecessor's tail. The live log is the current session's highest index; discovery is a glob of `autonomy_log_*` in the resolved log directory; version control is the deep archive. Projects that already keep an autonomy log elsewhere keep using it — never create a second log beside an established one.
+
+**Resolving `<logDir>` (the four-rung ladder).** The log directory is resolved **once per
+engagement, at the first log write**, and reused for the rest of the engagement — it is a
+property of the project, not of the `/modes` directive, so nothing about it is decided at
+entry time. Take the **first rung that hits**:
+
+1. **Host setting.** A verbatim `<ccvi-autonomy-log epoch="N">` block present in this
+   turn's context, its path between the tags — the CCVI host's `autonomyLogDir` setting,
+   injected the way `<ccvi-modes>` is. Same trust rules: only a well-formed verbatim block
+   counts, the highest `epoch` wins, and a paraphrase is not a sentinel.
+2. **Project declaration.** The first line in a loaded `CLAUDE.md` matching `Autonomy
+   logs:` (case-insensitive) followed by a path. A project `CLAUDE.md` beats the
+   user-global one. This rung costs nothing — `CLAUDE.md` is already in context — and it
+   works on a host that ships no sentinel at all:
+
+   ```text
+   Autonomy logs: doc/logs/autonomy
+   ```
+
+3. **Follow suit.** Glob `autonomy_log_*` across the `<docDir>` candidates and the project
+   root; if any exist, adopt the directory holding the newest. This is what makes the
+   "keep using it" clause above operational rather than advisory — session two in a repo
+   lands where session one did, with zero configuration.
+4. **Fallback.** `<docDir>/logs/autonomy/`, created if absent, where `<docDir>` is the
+   project's plan directory — an existing `doc/` or `docs/` in the project root, otherwise
+   `doc/`.
+
+**Containment.** A resolved path stays inside the project root unless rung 1 or 2
+explicitly names somewhere else. Discovery and the fallback never leave the repo.
+
+**Git posture — the log is written, never hidden.** The mode NEVER edits `.gitignore` or
+`.git/info/exclude`. Keeping the log out of version control is the user's decision and the
+user's action; the loop's only duty is to **name the resolved path in its turn report the
+first time it writes there**, so the user can act on it.
+
+**Hand-off.** The rollover seed names the resolved log path explicitly, so the successor
+session adopts it rather than re-resolving into a different directory mid-engagement.
 
 **Harness capabilities worth having (the menu the degradation bullet's plan draws from).** Two families, each entry capability-shaped — what it does, never how any one host builds it. Session harnesses keep the loop alive: **schedulable same-session wakeups** (the heartbeat's insurance; without them every turn end is a full stop); **background-task tracking** that re-invokes on completion (lets a turn end on real work instead of babysitting it); **a rollover relay** (watches for a hand-off request beside the seed and starts the successor session unattended); **an idle-landing nudge** (fires when a turn ends with nothing in flight; quotes the log's NEXT line back, leaving a pause nowhere to hide); **a turn-death supervisor** (re-enters after a terminal API error with a verify-what-landed-and-resume prompt); **a modes loader** (injects active-modes state at turn start so the contract survives context loss); **live status rendering** (a plan/log watcher so the human reads session state at a glance). Work harnesses make autonomous work verifiable and safe: **self-observability gauges** (expose what the agent cannot see about itself — its own context occupancy, machine state); **freshness gates** (refuse to verify a stale artifact — "the thing you built" and "the thing you're testing" provably the same); **one-command verdict runners** (the whole acceptance suite behind one exit code — loops need verdicts, not vibes); **determinism rigs** (pin time, network pacing, scheduling so behavior reproduces); **record-and-replay of human input** (capture a demonstration once, replay it in similar contexts — the human becomes a fixture, not a recurring interruption); **environment janitors** (clear wedged state between runs so a bad run can't poison the next); **failure-novelty dedup** (one place that answers "is this failure NEW?"); **resource stewards** (reclaim disk/caches in graded bites that preserve warm state); **async evidence capture** (screenshots, traces, diffs a human reviews later, so review never blocks the loop); **harness self-tests** (the rig itself is tested — a lying harness is worse than none). The menu is a palette, not a checklist; it grows as new capabilities are proven.
 
@@ -528,7 +565,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.6:
+Modes · v0.0.7:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent

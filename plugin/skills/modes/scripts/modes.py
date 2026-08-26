@@ -94,7 +94,7 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.6:
+HELP_TEXT = """Modes · v0.0.7:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
@@ -398,16 +398,20 @@ LAW = {
         "promise work the turn didn't do; a milestone summary is not a stopping point — "
         "summarize, then keep working or arm in the same turn\n"
         "• decide-log-continue — make the best call under the project's stated guidance (specs, "
-        "plans, conventions; absent those, the most defensible reading of intent), log decision "
-        "+ rationale + the NEXT unit, and keep going; the log is this engagement's "
-        "autonomy_log_<session>_<NN>.md at the project root (fresh file per engagement, "
-        "materialized on first entry, seeded with a ≤10-line digest of the newest predecessor's "
-        "tail) or wherever the project already keeps its log, with each new entry echoed in the "
-        "turn's report — where no writable project exists, the echoed entry itself is the log; a "
-        "wrong-but-logged call beats a stalled session, and entering this mode accepts that "
-        "rollback risk; cost and effort forecasts are NEVER a reason to stop, shrink, or ask — "
-        "your forecasts run in human-engineer units and are reliably wrong; when a fork's "
-        "recommended option is \"keep going\", TAKE it\n"
+        "plans, conventions; absent those, the most defensible reading of intent), log decision + "
+        "rationale + the NEXT unit, and keep going; the log is this engagement's "
+        "autonomy_log_<session>_<NN>.md in the RESOLVED log directory — first hit of: a host "
+        "<ccvi-autonomy-log> sentinel, an `Autonomy logs:` line in CLAUDE.md, the directory an "
+        "existing autonomy_log_* already sits in, else <docDir>/logs/autonomy — resolved ONCE at "
+        "the first log write, its path named in that turn's report, and NEVER a .gitignore edit "
+        "(the log is written, never hidden; ignoring it is the user's call) (fresh file per "
+        "engagement, materialized on first entry, seeded with a ≤10-line digest of the newest "
+        "predecessor's tail), with each new entry echoed in the turn's report — where no writable "
+        "project exists, the echoed entry itself is the log; a wrong-but-logged call beats a "
+        "stalled session, and entering this mode accepts that rollback risk; cost and effort "
+        "forecasts are NEVER a reason to stop, shrink, or ask — your forecasts run in "
+        "human-engineer units and are reliably wrong; when a fork's recommended option is \"keep "
+        "going\", TAKE it\n"
         "• stop-and-ask ONLY for: contradicting the project's stated guidance with no compliant "
         "path; a compounding, hard-to-reverse fork the guidance genuinely cannot arbitrate; "
         "destructive actions; real-world money (purchases, paid services — NOT token/compute "

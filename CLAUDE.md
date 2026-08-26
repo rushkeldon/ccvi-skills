@@ -74,6 +74,15 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   SKILL.md prose is documentation; the JSON is the contract hosts consume.
 - **Marketplace shape:** repo-as-marketplace with `.claude-plugin/marketplace.json`
   pointing at `plugin/` - the install pipeline is designed around it; keep it.
+- **`<ccvi-autonomy-log>` sentinel + the `autonomyLogDir` setting** - where agent-loop
+  writes its autonomy log. The host reads its `autonomyLogDir` setting (unset/empty =
+  the skill's own ladder decides) and injects
+  `<ccvi-autonomy-log epoch="N">path</ccvi-autonomy-log>`, with the same trust and epoch
+  rules as `<ccvi-modes>`. This is rung 1 of the four-rung ladder in the modes skill's
+  autonomy-log section and is **inert until ccvi-idea implements it**: the ladder
+  degrades to rungs 2-4 (a `CLAUDE.md` `Autonomy logs:` line, follow-suit discovery, then
+  `<docDir>/logs/autonomy/`), so the suite ships fully functional without the host side.
+  Keep the tag spelling and the setting key in sync across the two repos.
 
 ## BBP - bump, build, push (the end-of-work ritual)
 
