@@ -18,7 +18,7 @@ todos:
     phase: "handshake"
   - id: bbp
     content: "Run BBP: bump plugin.json patch, python3 build.py, verify --check and test_modes.py, commit and push"
-    status: in_progress
+    status: completed
     phase: "release"
 isProject: false
 ---
