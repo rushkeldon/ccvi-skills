@@ -9,13 +9,16 @@ tightly-coupled Claude Code skills - `modes`, `plans`, `seedprompt`, and
 > enforcement hook, the `<ccvi-modes>` sentinel, the Plan Editor, the seedprompt
 > rollover relay), and each skill assumes its siblings are installed.
 
-The host also supplies the `autonomyLogDir` setting, injected as a
-`<ccvi-autonomy-log epoch="N">path</ccvi-autonomy-log>` sentinel - rung 1 of the
-agent-loop autonomy-log resolution ladder. It is optional: without it the ladder
-falls through to a `CLAUDE.md` `Autonomy logs:` line, then to wherever existing
-`autonomy_log_*` files already live, then to `<docDir>/logs/autonomy/`.
+The host also supplies two optional sentinels for the agent-loop autonomy log. A
+`<ccvi-autonomy-log epoch="N">path</ccvi-autonomy-log>` block is rung 1 of the resolution
+ladder; without it the ladder falls through to a `CLAUDE.md` `Autonomy logs:` line, then
+to wherever existing `autonomy_log_*` files already live, then to
+`<docDir>/logs/autonomy/`. A `<ccvi-doc-dir epoch="N">notes</ccvi-doc-dir>` block names
+the project's plan directory, which is what `<docDir>` resolves to - it is an input to
+that term, never a rung of its own. In both cases the **tag is the contract**; the
+settings keys behind them are host-local.
 
-Current version: ccvi-skills · v0.0.7
+Current version: ccvi-skills · v0.0.8
 
 ## The skills
 

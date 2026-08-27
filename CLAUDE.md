@@ -74,15 +74,27 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   SKILL.md prose is documentation; the JSON is the contract hosts consume.
 - **Marketplace shape:** repo-as-marketplace with `.claude-plugin/marketplace.json`
   pointing at `plugin/` - the install pipeline is designed around it; keep it.
-- **`<ccvi-autonomy-log>` sentinel + the `autonomyLogDir` setting** - where agent-loop
-  writes its autonomy log. The host reads its `autonomyLogDir` setting (unset/empty =
-  the skill's own ladder decides) and injects
+- **`<ccvi-autonomy-log>` sentinel** - where agent-loop writes its autonomy log. **The
+  tag is the contract; the setting key behind it is host-local** and is deliberately not
+  pinned here (ccvi-idea's namespace differs from any name this repo would invent). The
+  host reads its autonomy-log-directory setting (unset/empty = the skill's own ladder
+  decides) and injects
   `<ccvi-autonomy-log epoch="N">path</ccvi-autonomy-log>`, with the same trust and epoch
   rules as `<ccvi-modes>`. This is rung 1 of the four-rung ladder in the modes skill's
   autonomy-log section and is **inert until ccvi-idea implements it**: the ladder
   degrades to rungs 2-4 (a `CLAUDE.md` `Autonomy logs:` line, follow-suit discovery, then
   `<docDir>/logs/autonomy/`), so the suite ships fully functional without the host side.
-  Keep the tag spelling and the setting key in sync across the two repos.
+  Keep the tag spelling in sync across the two repos.
+- **`<ccvi-doc-dir>` sentinel** - the project's plan directory, injected as
+  `<ccvi-doc-dir epoch="N">notes</ccvi-doc-dir>` with the same trust rules as
+  `<ccvi-modes>` and its own independent epoch counter (highest-epoch-wins is evaluated
+  per tag). It feeds `<docDir>`, which rungs 3 and 4 of the autonomy-log ladder both
+  consume, and it is **never a rung** - rungs 1-3 are evaluated first, and the hint alone
+  never resolves the ladder. A value that is absolute or contains `..` is ignored, as is a
+  blank body (blank-is-a-miss applies to `<ccvi-autonomy-log>` too). Also **inert until
+  ccvi-idea emits it**: without it `<docDir>` falls back to probing for `doc/` or `docs/`.
+  Its purpose is a host whose plan directory is set to something other than `doc` - without
+  the hint, plans land in `notes/` while logs land in `doc/logs/autonomy/`.
 
 ## BBP - bump, build, push (the end-of-work ritual)
 

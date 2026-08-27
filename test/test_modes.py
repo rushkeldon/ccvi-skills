@@ -288,6 +288,11 @@ def main():
     check("aloop/law-log-ladder", "<ccvi-autonomy-log>" in LAW_AL)
     check("aloop/law-log-fallback", "<docDir>/logs/autonomy" in LAW_AL)
     check("aloop/law-log-hands-off-git", "NEVER a .gitignore edit" in LAW_AL)
+    # SKILL.md prose (not LAW): the doc-dir hint and the phrase keeping it out of rung 1
+    check("aloop/docdir-hint", "<ccvi-doc-dir>" in md,
+          "the <ccvi-doc-dir> hint is missing from the ladder prose")
+    check("aloop/docdir-not-a-rung", "never a rung-1 hit" in md,
+          "the phrase keeping the doc-dir hint out of rung 1 is missing")
     # the machine-grabbing bookends bullet was cut with no trace
     for gone in ("Stop/Start bookends", "desktop hide", "machine-grabbing"):
         check("aloop/law-cut[{}]".format(gone), gone not in LAW_AL,

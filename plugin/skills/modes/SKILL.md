@@ -204,11 +204,41 @@ If work remains and you are about to end a turn without work in flight and a wak
 **Resolving `<logDir>` (the four-rung ladder).** The log directory is resolved **once per
 engagement, at the first log write**, and reused for the rest of the engagement — it is a
 property of the project, not of the `/modes` directive, so nothing about it is decided at
-entry time. Take the **first rung that hits**:
+entry time.
+
+**`<docDir>` — one definition, two consumers.** Rungs 3 and 4 both reference `<docDir>`, so
+it is defined once, here: **`<docDir>` is the project's plan directory — a verbatim
+`<ccvi-doc-dir epoch="N">` hint present in this turn's context, otherwise an existing
+`doc/` or `docs/` in the project root, otherwise `doc/`.**
+
+```text
+<ccvi-doc-dir epoch="3">notes</ccvi-doc-dir>
+```
+
+The hint carries a **fact about the project's layout** (the host's plan directory), never a
+preference about where logs go — so it is an INPUT to `<docDir>` and **never a rung-1 hit**.
+Rungs 1-3 are evaluated first and in order; the hint's presence alone never resolves the
+ladder. Its trust rules match `<ccvi-modes>`: only a well-formed verbatim block counts, a
+paraphrase is not a sentinel, and the highest `epoch` wins — an independent counter,
+evaluated per tag. Four further rules:
+
+- **Containment, checked mechanically.** A hint value that is absolute, or contains `..`,
+  is ignored and the probe runs. No filesystem access needed to apply the rule. An
+  out-of-repo log directory is a *preference*, which is what rungs 1 and 2 exist for.
+- **A blank body is a miss, not a hit** — for `<ccvi-doc-dir>`, for `<ccvi-autonomy-log>`,
+  and for a `CLAUDE.md` `Autonomy logs:` line with an empty value alike. A blank
+  declaration resolves nothing and the next rung (or the probe) runs.
+- **No trailing-slash significance** — `notes` and `notes/` are the same value.
+- **Resolve once, never re-check.** The skill adds no logic to wait for the hint or re-poll
+  for it on a later turn; keeping it in context at the first-log-write moment is the host's
+  obligation, not this ladder's.
+
+Take the **first rung that hits**:
 
 1. **Host setting.** A verbatim `<ccvi-autonomy-log epoch="N">` block present in this
-   turn's context, its path between the tags — the CCVI host's `autonomyLogDir` setting,
-   injected the way `<ccvi-modes>` is. Same trust rules: only a well-formed verbatim block
+   turn's context, its path between the tags — the CCVI host's autonomy-log-directory
+   setting, injected the way `<ccvi-modes>` is (the tag is the contract; the setting's key
+   is host-local and deliberately unnamed here). Same trust rules: only a well-formed verbatim block
    counts, the highest `epoch` wins, and a paraphrase is not a sentinel.
 2. **Project declaration.** The first line in a loaded `CLAUDE.md` matching `Autonomy
    logs:` (case-insensitive) followed by a path. A project `CLAUDE.md` beats the
@@ -219,13 +249,11 @@ entry time. Take the **first rung that hits**:
    Autonomy logs: doc/logs/autonomy
    ```
 
-3. **Follow suit.** Glob `autonomy_log_*` across the `<docDir>` candidates and the project
-   root; if any exist, adopt the directory holding the newest. This is what makes the
+3. **Follow suit.** Glob `autonomy_log_*` in `<docDir>` and in the project root; if any
+   exist, adopt the directory holding the newest. This is what makes the
    "keep using it" clause above operational rather than advisory — session two in a repo
    lands where session one did, with zero configuration.
-4. **Fallback.** `<docDir>/logs/autonomy/`, created if absent, where `<docDir>` is the
-   project's plan directory — an existing `doc/` or `docs/` in the project root, otherwise
-   `doc/`.
+4. **Fallback.** `<docDir>/logs/autonomy/`, created if absent.
 
 **Containment.** A resolved path stays inside the project root unless rung 1 or 2
 explicitly names somewhere else. Discovery and the fallback never leave the repo.
@@ -565,7 +593,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.7:
+Modes · v0.0.8:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
