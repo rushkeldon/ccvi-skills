@@ -94,7 +94,7 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.8:
+HELP_TEXT = """Modes · v0.0.9:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
@@ -342,7 +342,10 @@ LAW = {
     ),
     "agent": (
         "AGENT MODE — full agency, the default working stance. No plan-mode write filter; "
-        "any other active modes (include / exclude / one-word / sbs) still bind."
+        "any other active modes (include / exclude / one-word / sbs) still bind. When your "
+        "work is driven by a *.plan.md and the host advertises a plan-editor open command, run "
+        "it with the plan's absolute path as you take the plan up; no advertised command → "
+        "ignore this."
     ),
     "agent-loop": (
         "⛔ AGENT-LOOP MODE — a standing keep-moving contract, in force on EVERY turn until the "
@@ -458,6 +461,11 @@ LAW = {
         "— into the project's plan directory, once (skip if a predecessor already wrote it), log "
         "and report the written path, and leave it UNBUILT: building it takes the user's express "
         "direction\n"
+        "• plan surfacing — when your work is driven by a *.plan.md and the host advertises a "
+        "plan-editor open command (a capability note in your system prompt naming the exact "
+        "command), run it with the plan's ABSOLUTE path as you take the plan up, and again when "
+        "you switch plans; the command's printed acknowledgment is authoritative — opening the "
+        "tab is the host's job, CONTINUE the turn; no advertised command → this duty is inert\n"
         "If work remains and you are about to end a turn without work in flight and a wakeup "
         "armed, you have already erred — spawn and arm before you land; never land idle (the "
         "drained rollover hand-off is the one sanctioned landing: the invariant passes to the "

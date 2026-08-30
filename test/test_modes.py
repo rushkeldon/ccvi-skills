@@ -288,6 +288,7 @@ def main():
     check("aloop/law-log-ladder", "<ccvi-autonomy-log>" in LAW_AL)
     check("aloop/law-log-fallback", "<docDir>/logs/autonomy" in LAW_AL)
     check("aloop/law-log-hands-off-git", "NEVER a .gitignore edit" in LAW_AL)
+    check("aloop/law-plan-surfacing", "plan surfacing" in LAW_AL)
     # SKILL.md prose (not LAW): the doc-dir hint and the phrase keeping it out of rung 1
     check("aloop/docdir-hint", "<ccvi-doc-dir>" in md,
           "the <ccvi-doc-dir> hint is missing from the ladder prose")

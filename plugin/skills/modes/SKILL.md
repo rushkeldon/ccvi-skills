@@ -167,7 +167,7 @@ Don't drop the user's chosen directory silently — but per rule 1 above, a new 
 
 ### agent
 
-Full agency. No plan-mode write filter. Entering `agent` exits `plan` or `agent-loop` if active. Other modes (`include`, `exclude`, `one-word`, `sbs`) continue to apply.
+Full agency. No plan-mode write filter. Entering `agent` exits `plan` or `agent-loop` if active. Other modes (`include`, `exclude`, `one-word`, `sbs`) continue to apply. When your work is driven by a `*.plan.md` and the host advertises a plan-editor open command, run it with the plan's absolute path as you take the plan up; no advertised command → ignore this.
 
 This is the default working stance, but having it as a named mode lets the user explicitly switch out of plan mode in one step (`/modes agent`) instead of `/modes clear` + adjusting expectations.
 
@@ -195,6 +195,7 @@ The autonomous keep-moving flywheel. The mode is a **two-state contract**: enter
 • rollover threshold — when the mode entry carries a percentage (`agent-loop: N`), treat N% context usage as the hand-off point: drain in-flight work first — a successor cannot receive a worker's return; finish or land the current units and spawn nothing new (a background job's on-disk artifacts DO survive — name them in the seed so the successor harvests them) — then author the hand-off with `/seedprompt write` and request the fresh session: on a host with a rollover relay, create an empty `rollover.request` beside the seed in the memory root and end the turn; on a host without one, state truthfully that the seed is written and the user must start the fresh session themselves
 • pace hand-offs — sustained cadence, never bursts: more than one hand-off within a few minutes is a fault signal — stop and surface it instead of churning sessions
 • degradation, never refusal — where the host lacks a capability this law names (wakeups, task tracking, sub-agent spawning, model or effort pins, a writable project, a rollover relay), the duty naming it degrades to its nearest honest equivalent and every other duty binds unchanged: maximum forward motion within each turn, no mid-work permission asks outside the taxonomy above, and a truthful "nothing will self-wake" note at every turn end; when the flywheel first engages on such a host, WRITE the plan for the missing capability — the gap that most limits the loop, drawn from this mode's harness menu; `/plans write` where a plans skill is available, else a plain `*.plan.md` — into the project's plan directory, once (skip if a predecessor already wrote it), log and report the written path, and leave it UNBUILT: building it takes the user's express direction
+• plan surfacing — when your work is driven by a *.plan.md and the host advertises a plan-editor open command (a capability note in your system prompt naming the exact command), run it with the plan's ABSOLUTE path as you take the plan up, and again when you switch plans; the command's printed acknowledgment is authoritative — opening the tab is the host's job, CONTINUE the turn; no advertised command → this duty is inert
 If work remains and you are about to end a turn without work in flight and a wakeup armed, you have already erred — spawn and arm before you land; never land idle (the drained rollover hand-off is the one sanctioned landing: the invariant passes to the successor session).
 ```
 <!-- /LAW:agent-loop -->
@@ -593,7 +594,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.8:
+Modes · v0.0.9:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
