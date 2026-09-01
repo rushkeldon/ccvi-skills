@@ -46,7 +46,7 @@ todos:
     phase: "P3 verbs"
   - id: manifest-and-bbp
     content: "Add repos to MANIFEST_SKILLS in build.py (verbs + ordered params) plus a STAMPS entry for the repos help header; flip the plans review/verify out-param manifest defaults from ./ to plan-dir; run python3 build.py && --check && test/test_modes.py, then BBP (bump plugin/.claude-plugin/plugin.json to the next version, build, commit, push)"
-    status: in_progress
+    status: completed
     phase: "P4 ship"
 isProject: false
 updates:
