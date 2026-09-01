@@ -49,7 +49,7 @@ ccvi-skills/
 - The suite version lives **only** in `plugin/.claude-plugin/plugin.json`. It starts
   at `0.0.0` and increments patch-wise: `0.0.1` ... `0.0.99`, then rolls to `0.1.0`.
   `1.0.0` is a deliberate future ship decision, not an increment.
-- Release procedure is **BBP** (below). Never bump inside build.py; the script
+- Release procedure is **BBPI** (below). Never bump inside build.py; the script
   stamps, it never bumps.
 - `python3 build.py --check` must exit 0 before any release: it verifies all stamps
   and the zip's currency.
@@ -96,7 +96,7 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   Its purpose is a host whose plan directory is set to something other than `doc` - without
   the hint, plans land in `notes/` while logs land in `doc/logs/autonomy/`.
 
-## BBP - bump, build, push (the end-of-work ritual)
+## BBP / BBPI - bump, build, push, install (the end-of-work ritual)
 
 At the end of any finished bit of work - a plan built, a fix landed, any coherent
 chunk done - run **BBP** automatically, without being asked:
@@ -111,8 +111,19 @@ chunk done - run **BBP** automatically, without being asked:
    exit 0.
 3. **push** - `git add -A`, commit with a message describing the work (not just
    "bump"), and push to `main`.
+4. **install** (the `I` in BBPI) - refresh this machine's live CCVI install so the
+   new build is immediately usable:
+   `unzip -o -q ccvi-skills.zip -d ~/.ccvi/ccvi-skills/plugin/` - the same
+   extraction the ccvi-idea host performs (the zip root IS the plugin payload, per
+   the consumer contract above). Verify the installed
+   `~/.ccvi/ccvi-skills/plugin/.claude-plugin/plugin.json` shows the new version.
+   Note: the ccvi-idea IDE plugin bundles the zip at ITS build time, so a plugin
+   restart alone never picks up a new suite version - this step is what does.
+   New/changed skills register in the NEXT Claude Code session, not the current one.
 
-The user typing `BBP` (any casing) is a direct order to run the ritual now.
+The user typing `BBP` or `BBPI` (any casing) is a direct order to run the ritual
+now. Run all four steps either way - `BBP` is the historical name, not a
+three-step subset.
 
 ## Hard rules
 
