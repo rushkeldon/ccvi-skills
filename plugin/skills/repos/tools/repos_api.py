@@ -13,6 +13,7 @@ Subcommands:
   forge pr          --repo R --branch B [--base BASE] [--title T --body-file F]
   forge threads     --repo R --pr N
   forge comment     --repo R --pr N --path P --line L --body-file F
+  forge check-git-credentials [--remote NAME]
   github export     --repo R --branch B --base BASE --title T --body-file F
                     --comments-file J [--dry-run]
   selftest
@@ -147,6 +148,95 @@ def forge_comment(args):
                     "path": args.path, "line": int(args.line)}))
 
 
+# ------------------------------------------------- git credential diagnostics
+
+def credential_next_action(helper, keychain, ls_remote):
+  """Pure diagnosis-to-remediation mapping (hermetic; covered by selftest).
+
+  helper: the effective credential.helper value, or None when none is configured.
+  keychain: "present" | "absent" | "unknown" (keychain entry for the forge host).
+  ls_remote: True iff git can actually reach the forge with working credentials.
+  """
+  if ls_remote:
+    return "Nothing to do - git credentials for the forge work."
+  if helper and keychain == "present":
+    return ("A credential for the forge host is stored but git cannot use it - it is "
+            "likely stale. Delete it (`security delete-internet-password -s "
+            "<forge host>`), then run `git push forge <branch>` once; git will "
+            "prompt, and you enter your forge username and an access token as the "
+            "password.")
+  if helper:
+    return ("Run `git push forge <branch>` in your terminal once; git will prompt "
+            "for a username and password. Use your forge login and an access token "
+            "as the password. The helper stores it and later pushes are silent.")
+  return ("No git credential helper is configured. Pick a mechanism in /repos init "
+          "step 7: HTTPS with a credential helper (recommended - e.g. `git config "
+          "--global credential.helper osxkeychain`), or SSH, which needs the "
+          "forge's SSH listener enabled and a public key registered on your forge "
+          "account.")
+
+
+def forge_check_git_credentials(args):
+  """Report helper, keychain entry, and a real ls-remote probe; exit 0 iff ok.
+
+  Never raises on a negative answer - a negative answer IS the result. Only a
+  missing git binary or a missing manifest (no remote AND no forge_url) dies.
+  """
+  helper = None
+  helper_source = None
+  try:
+    res = subprocess.run(
+      ["git", "config", "--show-origin", "--get-all", "credential.helper"],
+      capture_output=True, text=True)
+  except FileNotFoundError:
+    _die("git not found", "install git (xcode-select --install or brew install git)")
+  if res.returncode == 0 and res.stdout.strip():
+    # last entry wins in git's own resolution; line shape: "file:<path>\t<value>"
+    source, _, value = res.stdout.strip().splitlines()[-1].partition("\t")
+    helper = value or None
+    helper_source = source.partition(":")[2] or source
+
+  res = subprocess.run(["git", "remote", "get-url", args.remote],
+                       capture_output=True, text=True)
+  if res.returncode == 0:
+    target, target_url = args.remote, res.stdout.strip()
+  else:
+    # remote not wired yet (open's preflight runs before it exists): probe the
+    # instance URL from the manifest instead of a named remote
+    target = target_url = _forge_base()
+
+  host = target_url.split("://", 1)[-1]
+  if "@" in host.split("/", 1)[0]:
+    host = host.split("@", 1)[1]
+  host = host.split("/", 1)[0].split(":", 1)[0]
+
+  try:
+    # NO -w: metadata only, never the secret - output stays chat-log safe
+    res = subprocess.run(["security", "find-internet-password", "-s", host],
+                         capture_output=True, text=True)
+    keychain = "present" if res.returncode == 0 else "absent"
+  except FileNotFoundError:
+    keychain = "unknown"
+
+  # GIT_TERMINAL_PROMPT=0 so a missing credential fails fast instead of hanging
+  # on a prompt no agent can answer; shell form because env-per-call needs it
+  # without importing os
+  quoted = "'" + target.replace("'", "'\\''") + "'"
+  res = subprocess.run("GIT_TERMINAL_PROMPT=0 git ls-remote " + quoted,
+                       shell=True, capture_output=True, text=True)
+  ls_remote = res.returncode == 0
+
+  print(json.dumps({
+    "helper": helper,
+    "helper_source": helper_source,
+    "keychain": keychain,
+    "ls_remote": ls_remote,
+    "ok": ls_remote,
+    "next_action": credential_next_action(helper, keychain, ls_remote),
+  }))
+  sys.exit(0 if ls_remote else 1)
+
+
 # ------------------------------------------------------- diff-hunk arithmetic
 
 def line_from_hunk(diff_hunk):
@@ -245,10 +335,32 @@ def selftest(_args):
     got = line_from_hunk(hunk)
     if got != expected:
       failures.append({"case": name, "expected": expected, "got": got})
+  na_cases = [
+    # (helper, keychain, ls_remote, expected substring of next_action) - the
+    # full diagnosis matrix; hermetic, no git/security shell-outs
+    ("osxkeychain", "present", True,  "Nothing to do"),
+    ("osxkeychain", "absent",  True,  "Nothing to do"),
+    ("osxkeychain", "unknown", True,  "Nothing to do"),
+    (None,          "present", True,  "Nothing to do"),
+    (None,          "absent",  True,  "Nothing to do"),
+    (None,          "unknown", True,  "Nothing to do"),
+    ("osxkeychain", "present", False, "likely stale"),
+    ("osxkeychain", "absent",  False, "git will prompt"),
+    ("osxkeychain", "unknown", False, "git will prompt"),
+    (None,          "present", False, "No git credential helper"),
+    (None,          "absent",  False, "No git credential helper"),
+    (None,          "unknown", False, "No git credential helper"),
+  ]
+  for helper, keychain, ls_remote, expected in na_cases:
+    got = credential_next_action(helper, keychain, ls_remote)
+    if expected not in got:
+      failures.append({
+        "case": "next_action({}, {}, {})".format(helper, keychain, ls_remote),
+        "expected": expected, "got": got})
   if failures:
     print(json.dumps({"selftest": "FAIL", "failures": failures}))
     sys.exit(1)
-  print(json.dumps({"selftest": "OK", "cases": len(cases)}))
+  print(json.dumps({"selftest": "OK", "cases": len(cases) + len(na_cases)}))
 
 
 # ---------------------------------------------------------------------- main
@@ -280,6 +392,9 @@ def main():
   p.add_argument("--line", required=True)
   p.add_argument("--body-file", required=True)
   p.set_defaults(fn=forge_comment)
+  p = forge.add_parser("check-git-credentials")
+  p.add_argument("--remote", default="forge")
+  p.set_defaults(fn=forge_check_git_credentials)
 
   github = sub.add_parser("github").add_subparsers(dest="verb", required=True)
   p = github.add_parser("export")

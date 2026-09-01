@@ -124,6 +124,8 @@ forge pr          --repo R --branch B [--base BASE] [--title T --body-file F]
                                                 create-or-get -> {number, url, existing}
 forge threads     --repo R --pr N               all inline comments -> see shape below
 forge comment     --repo R --pr N --path P --line L --body-file F
+forge check-git-credentials [--remote NAME]     helper + keychain + ls-remote probe
+                                                -> {ok, next_action}; exit 0 iff ok
 github export     --repo R --branch B --base BASE --title T --body-file F
                   --comments-file J [--dry-run]  push is the CALLER's job; creates the
                                                 origin PR + ONE pending review
@@ -175,22 +177,32 @@ the check fails):
    address is loopback (`lsof -iTCP:3000 -sTCP:LISTEN` shows `127.0.0.1`).
 3. **Service:** `brew services start forgejo` (a no-op if already running).
    *Verify:* `brew services list` shows forgejo `started`.
-4. **Admin user - the USER's step, in the USER's browser.** Bring the user to the
-   installer (`http://127.0.0.1:3000`, "Administrator account settings" at the
-   bottom); the user fills the form and submits. **Credentials never transit the
-   agent**: no passwords in chat, in CLI args, or in a form the agent fills - the
-   skill states what is needed, then waits. (The installer calls this section
+4. **Admin user - the USER's step, in the USER's browser.** This account is a
+   **local identity on the user's own forge instance** - unrelated to any GitHub
+   or enterprise account - and its username is the username half of the git
+   credential seeded in step 7. Bring the user to the installer
+   (`http://127.0.0.1:3000`, "Administrator account settings" at the bottom); the
+   user fills the form and submits. **Credentials never transit the agent**: no
+   passwords in chat, in CLI args, or in a form the agent fills - the skill
+   states what is needed, then waits. (The installer calls this section
    "optional" - first registered user becomes admin - but that path assumes
    self-registration; with self-registration DISABLED, as this runbook configures,
    nobody can register, so create the admin here. The escape hatch if skipped:
    `forgejo admin user create --admin ...`, run by the user.)
-   *Verify:* after the user says it's done - via the API with the token from
-   step 6.
+   *Verify:* checkable right now, no token needed - the installer redirects to a
+   logged-in session at `http://127.0.0.1:3000`, or the user runs
+   `forgejo admin user list` and sees the account.
 5. **Org namespaces:** ask which orgs to create - suggest `personal` + `disney` -
    and create each (UI, or `POST /api/v1/orgs` once the token exists). Orgs give
-   per-origin separation inside the single instance.
-   *Verify:* `GET /api/v1/orgs/{org}` returns each.
-6. **API token - the USER's step, same rule as step 4.** In the user's browser:
+   per-origin separation inside the single instance, and the org name is what
+   first `/repos open` asks for when it files a repo under the forge - choosing
+   now avoids that prompt later.
+   *Verify:* while logged in, `http://127.0.0.1:3000/<org>` loads for each org
+   (or `GET /api/v1/orgs/{org}` once the step-6 token exists).
+6. **API token - the USER's step, same rule as step 4.** This token authorizes
+   the **REST calls made by the bundled tool** (creating repos, PRs, comments);
+   it is **not** what git uses when it pushes - that is a separate credential,
+   which is why step 7 exists. In the user's browser:
    Settings → Applications → **New access token** (the top section - NOT "Create a
    new OAuth2 application", which is a different mechanism). Name it, leave access
    "All", set exactly three permission dropdowns - **repository: Read and Write**,
@@ -199,7 +211,38 @@ the check fails):
    `mkdir -p ~/.config/repos && printf '%s' '<token>' > ~/.config/repos/forge_token && chmod 600 ~/.config/repos/forge_token`.
    *Verify:* `curl -s -H "Authorization: token $(cat ~/.config/repos/forge_token)"
    http://127.0.0.1:3000/api/v1/user` returns the admin user.
-7. **Config root:** scaffold `~/.config/repos/manifest.json` if absent:
+7. **Git credentials for the forge remote - the USER's step.** The API token from
+   step 6 authenticates REST calls; **git does not use it**. Without a git
+   credential the first `/repos open` fails at its push with
+   `could not read Username`. Present the choice below, have the user pick and
+   seed; credentials never transit the agent.
+
+   **Ask, don't prescribe.** Lay out the problem space in prose first, then
+   collect the answer with the AskUserQuestion tool - neither mechanism is right
+   for everyone:
+
+   - **HTTPS plus a credential helper (recommend this).** The credential is the
+     forge username with an access token as the password. A helper may already be
+     active and inherited from a config file the user never wrote (on macOS,
+     Xcode's gitconfig ships `osxkeychain` machine-wide) - run
+     `python3 tools/repos_api.py forge check-git-credentials` to see the effective
+     helper AND the config file it came from. The forge is plain `http` on
+     loopback: the exchange is unencrypted but never leaves the machine.
+     Recommended because on a machine with a working helper it needs no
+     configuration change at all.
+   - **SSH.** Keeps tokens out of git entirely and matches how many people
+     already reach an enterprise host - at the cost of a forge *server* change:
+     enable the SSH listener in the work-path `app.ini`, register a public key on
+     the forge account, and re-point the `forge` remote at the SSH URL.
+
+   **Seeding, HTTPS route** (the user runs it, either way): one interactive
+   `git push forge <branch>` - git prompts, the user enters the forge username
+   and an access token as the password, the helper stores it and later pushes are
+   silent - or a printed one-liner the user runs with their own token
+   substituted:
+   `printf 'protocol=http\nhost=127.0.0.1:3000\nusername=<forge-user>\npassword=<token>\n' | git credential approve`.
+   *Verify:* `python3 tools/repos_api.py forge check-git-credentials` exits 0.
+8. **Config root:** scaffold `~/.config/repos/manifest.json` if absent:
    `{ "forge_url": "http://127.0.0.1:3000", "repos": {} }`.
    *Verify:* the file parses as JSON and names `forge_url`.
 
@@ -238,6 +281,12 @@ refresh) the local PR. Defaults: `branch` = the current branch; `base` = the ent
 
 **Steps, in order:**
 
+0. **Preflight credentials:** `python3 tools/repos_api.py forge
+   check-git-credentials`. On a non-zero exit, STOP and surface its
+   `next_action` - do not create the forge repo, do not touch the remote set, do
+   not attempt a push. Point the user at `/repos init` step 7. (Failing here
+   costs nothing; failing at step 4's push leaves a half-built forge repo and a
+   mutated remote set behind.)
 1. **Ensure the config entry** (create on first use - ask which forge org this repo
    belongs under).
 2. **Ensure the forge counterpart:** `forge ensure-repo --org <org> --name <repo>`.
@@ -323,7 +372,7 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.11 — local-forge PR pipeline:
+/repos · v0.0.12 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • open [branch] [base]              — push branch to forge, open/refresh local PR
