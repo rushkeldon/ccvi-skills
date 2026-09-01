@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "skills": [
     {
       "name": "modes",
@@ -105,7 +105,7 @@
               "name": "out",
               "required": false,
               "kind": "dir",
-              "default": "./"
+              "default": "plan-dir"
             },
             {
               "name": "model",
@@ -126,7 +126,7 @@
               "name": "out",
               "required": false,
               "kind": "dir",
-              "default": "./"
+              "default": "plan-dir"
             },
             {
               "name": "model",
@@ -396,6 +396,86 @@
               "required": false,
               "kind": "freeform",
               "default": "internal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "repos",
+      "invocation": "/repos [verb] [args]",
+      "verbs": [
+        {
+          "name": "init",
+          "params": []
+        },
+        {
+          "name": "config",
+          "params": [
+            {
+              "name": "kind",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "origin",
+              "required": false,
+              "kind": "freeform"
+            },
+            {
+              "name": "value",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "open",
+          "params": [
+            {
+              "name": "branch",
+              "required": false,
+              "kind": "freeform"
+            },
+            {
+              "name": "base",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "review",
+          "params": [
+            {
+              "name": "pr",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "status",
+          "params": [
+            {
+              "name": "pr",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "export",
+          "params": [
+            {
+              "name": "pr",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "dryRun",
+              "required": false,
+              "kind": "flag"
             }
           ]
         }

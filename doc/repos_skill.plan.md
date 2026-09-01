@@ -2,49 +2,58 @@
 humanEngineerDifficulty: 7
 name: /repos skill - local-forge PR pipeline
 overview: "New /repos skill in ccvi-skills: iterate a PR to polish on a LOCAL forge (Forgejo), then export the refined result - branch, description, and only the UNRESOLVED review comments - to the origin (GitHub) as a pending review. Verbs: init, config, open, review, status, export."
-version: "1.0"
+version: "1.1"
 todos:
   - id: scaffold-skill
     content: "Scaffold plugin/skills/repos/SKILL.md: frontmatter (name, description, argument-hint, allowed-tools, verbs schema) + invocation table + shared sections (forge adapter contract, config root, tokens)"
-    status: pending
+    status: completed
     phase: "P1 skeleton"
   - id: config-verb
     content: "Write the config verb section in SKILL.md: /repos config {kind} [origin] [value], kinds template|directions|base, import-not-reference, show-when-no-value"
-    status: pending
+    status: completed
     phase: "P1 skeleton"
-  - id: api-tool
-    content: "Build tools/repos_api.py: zero-dep python3 CLI wrapping the Forgejo REST API (repo create, PR create/get, reviews+comments list with resolved state, branch sync check) and the GitHub export primitives via gh api (PR create, pending review with inline comments)"
-    status: pending
-    phase: "P2 plumbing"
-  - id: spike-resolved-flag
-    content: "SPIKE: probe a live Forgejo for the resolved flag on PR review comment threads via API; record the field name in SKILL.md, or fall back to the reply-marker convention if absent"
-    status: pending
-    phase: "P2 plumbing"
   - id: init-verb
     content: "Write the init verb section in SKILL.md: brew install forgejo, localhost-only + SQLite first-run, org namespaces, token provisioning into ~/.config/repos/, idempotent re-run"
-    status: pending
-    phase: "P3 verbs"
+    status: completed
+    phase: "P2 plumbing"
+  - id: run-init
+    content: "Run /repos init on this machine following the just-written section: brew install forgejo, localhost-only + SQLite first-run, brew services start, admin user, org namespaces, token into ~/.config/repos/forge_token (0600), manifest.json scaffolded; fix the section wherever the runbook and reality diverge"
+    status: completed
+    phase: "P2 plumbing"
+  - id: spike-resolved-flag
+    content: "SPIKE: probe the live localhost Forgejo (stood up by run-init) for the resolved flag on PR review comment threads via API; record the field name in SKILL.md, or fall back to the reply-marker convention if absent"
+    status: completed
+    phase: "P2 plumbing"
+  - id: api-tool
+    content: "Build tools/repos_api.py: zero-dep python3 CLI wrapping the Forgejo REST API (repo create, PR create/get, reviews+comments list with resolved state, branch sync check) and the GitHub export primitives via gh api (PR create, pending review with inline comments)"
+    status: completed
+    phase: "P2 plumbing"
   - id: open-verb
     content: "Write the open verb section in SKILL.md: bootstrap forge counterpart + remote, sync base, push branch, draft description through template + directions, create-or-refresh the forge PR"
-    status: pending
+    status: completed
     phase: "P3 verbs"
   - id: review-verb
     content: "Write the review verb section in SKILL.md: inline Claude review of the forge PR diff, findings posted as inline forge comments via tools/repos_api.py, phrased per directions"
-    status: pending
+    status: completed
     phase: "P3 verbs"
   - id: status-verb
     content: "Write the status verb section in SKILL.md: thread counts, export preview, base drift, AI-trailer preflight scan"
-    status: pending
+    status: completed
     phase: "P3 verbs"
   - id: export-verb
     content: "Write the export verb section in SKILL.md: preflight (directions + trailer scan), push to origin, create origin PR with description verbatim, replay unresolved root comments as a PENDING review; dryRun prints the full payload"
-    status: pending
+    status: completed
     phase: "P3 verbs"
   - id: manifest-and-bbp
-    content: "Add repos to MANIFEST_SKILLS in build.py (verbs + ordered params), run python3 build.py && --check && test/test_modes.py, then BBP (bump plugin/.claude-plugin/plugin.json to the next version, build, commit, push)"
-    status: pending
+    content: "Add repos to MANIFEST_SKILLS in build.py (verbs + ordered params) plus a STAMPS entry for the repos help header; flip the plans review/verify out-param manifest defaults from ./ to plan-dir; run python3 build.py && --check && test/test_modes.py, then BBP (bump plugin/.claude-plugin/plugin.json to the next version, build, commit, push)"
+    status: in_progress
     phase: "P4 ship"
 isProject: false
+updates:
+  - type: review
+    model: "claude-fable-5"
+    at: "2026-08-31T18:02Z"
+    version: "1.1"
 ---
 
 # /repos skill - local-forge PR pipeline
@@ -133,6 +142,9 @@ Key structures:
 - **Assumes brew is present** for `init` (macOS is the only current target;
   consequence if brew is absent: `init` stops and names the manual install, it does
   not script around it).
+- **init runs once during this plan's execution** (`run-init`), on this machine -
+  macOS/brew, localhost-only, nothing destructive; the user is present for its
+  interactive steps (admin user, org names, token provisioning).
 - **Compliance posture**: everything here is interactive and human-in-the-loop - a
   human triggers every verb, and `export` stages a pending review a human submits.
   No headless claude, no scheduling, no credential capture (the forge token is for
@@ -151,9 +163,10 @@ stating the pipeline (local polish -> curated export); the invocation table (the
 verbs exactly as in Approach); shared sections: **Forge adapter contract**, **Config
 root**, **Tokens**, **Stage directions**, **Templates** (content per Approach and
 Conventions above); a **Help output** section (`/repos` bare prints the verb
-cheat-sheet, same convention as the sibling skills); an **Edge cases** stub grown by
-later todos; a **What this skill does NOT do** section (no auto-submit on GitHub, no
-review-thread history transfer, no GitLab adapter, no delegation).
+cheat-sheet, same convention as the sibling skills — its header opens `/repos · v0.0.0`,
+any version: build.py's STAMPS pass rewrites it on every build); an **Edge cases** stub
+grown by later todos; a **What this skill does NOT do** section (no auto-submit on
+GitHub, no review-thread history transfer, no GitLab adapter, no delegation).
 Why: every later todo edits this file; land the shared context first.
 DONE-WHEN: SKILL.md exists with all named sections; every fence tagged; the six-verb
 table matches Approach byte-for-byte on verbs/params.
@@ -166,13 +179,58 @@ to the origin URL of the repo the session is standing in; `value` present = set
 canonical; base: store the branch name), `value` absent = **show** the currently
 effective value, naming the source (committed repo template vs entry template vs
 default); bare `/repos config` dumps the whole entry. Creating a missing entry on
-first `config` or first `open` is allowed and identical.
-DONE-WHEN: section covers set/show/dump, import semantics, entry auto-creation, and
-an edge-case line for "run outside any git repo" (ask for `origin` explicitly).
+first `config` or first `open` is allowed and identical. Positional disambiguation
+(two optional args in sequence): `origin` is recognized by URL shape - it contains
+`://` or starts with `git@`; anything else in that slot is the `value`. In the
+manifest entry, `value` is kind `freeform` (its file-ness depends on `kind`).
+DONE-WHEN: section covers set/show/dump, import semantics, entry auto-creation, the
+URL-shape disambiguation rule, and an edge-case line for "run outside any git repo"
+(ask for `origin` explicitly).
 
-### P2 - plumbing
+### P2 - forge up, then plumbing
 
-**3. `api-tool`** - Build `plugin/skills/repos/tools/repos_api.py`.
+**3. `init-verb`** - `/repos init`, interactive, idempotent.
+Steps it prescribes: `brew install forgejo`; first-run config with
+`HTTP_ADDR = 127.0.0.1` and SQLite (walk the web installer or write app.ini per the
+Forgejo docs - state both, prefer the installer); `brew services start forgejo`;
+create the admin user; create org namespaces (ask which - suggest `personal` +
+`disney`); provision an API token scoped to repo+org and write it to
+`~/.config/repos/forge_token` (0600); scaffold `~/.config/repos/manifest.json`.
+Re-run = verify each step and repair, never reinstall. Every outward step is stated
+to the user before it runs (it is the user's machine, but nothing here is
+destructive).
+DONE-WHEN: section is a complete runbook a fresh session can execute; idempotence
+stated per step.
+
+**4. `run-init`** - Execute `/repos init` on this machine, following the section
+just written. This is both the install and the runbook's first real test: a fresh
+read either works end-to-end or the section gets fixed on the spot. It touches the
+machine (brew install, `brew services start forgejo`; nothing destructive), and it
+is the ONE step that cannot run unattended - admin user creation, org names, and
+token provisioning are interactive; the user must be at the keyboard.
+Why: install-first - the spike and the api tool need a live forge, and the runbook
+deserves a live exercise before it ships.
+DONE-WHEN: Forgejo answers on 127.0.0.1, the provisioned token authenticates against
+the API, and the init section required no further edits on a clean read-through.
+
+**5. `spike-resolved-flag`** - SPIKE: probe the resolved flag on the live Forgejo.
+What to try: against the live localhost forge that `run-init` just stood up, using
+raw `curl` with the provisioned token (`repos_api.py` does not exist yet at spike
+time): create a PR with an inline comment, resolve the conversation in the UI, then
+`GET /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews` + per-review comments and
+inspect for a resolver/resolved field.
+Branches: (a) field present -> record its exact name in the SKILL.md adapter section
+and consume it in `forge threads`; (b) field absent from the API -> fall back to the
+**reply-marker convention**: a thread counts as resolved when its latest reply body
+begins with `[resolved]` (the skill posts that reply when Keldon says a finding is
+handled, and `status` documents the convention); implement (b) in `forge threads`
+behind the same output field so consumers never branch.
+Why: the resolved flag is THE load-bearing claim of the whole design; probe it, don't
+trust docs.
+DONE-WHEN: the SKILL.md adapter section states which branch is in force with the
+probe evidence (endpoint + field name, or its absence) cited.
+
+**6. `api-tool`** - Build `plugin/skills/repos/tools/repos_api.py`.
 Anchor: new file. Zero-dep python3 (urllib, json, subprocess for `gh`). Subcommands
 (argparse, one per line, each printing JSON to stdout, exit 0/1):
 
@@ -196,42 +254,16 @@ The position->line mapping for forge comments lives here: prefer the API's file-
 fields; where only a diff position is returned, derive the line from the comment's
 diff hunk (`@@` header arithmetic) - this is the known-fiddly part, keep it in one
 function with a unit-style self-test runnable as `python3 repos_api.py selftest`.
+The `resolved` output field of `forge threads` implements whichever branch the spike
+recorded ((a) the API's field, or (b) the reply-marker convention) - the spike's
+answer is already known when this todo runs.
 Why: deterministic plumbing in one testable place; the SKILL.md orchestrates it.
 DONE-WHEN: `selftest` passes (hunk-mapping cases: added line, context line,
 multi-hunk); `forge threads` output shape documented in the SKILL.md.
 
-**4. `spike-resolved-flag`** - SPIKE: probe the resolved flag on a live Forgejo.
-What to try: after `init` exists (or against a throwaway `brew install forgejo`
-instance), create a PR with an inline comment, resolve the conversation in the UI,
-then `GET /api/v1/repos/{owner}/{repo}/pulls/{index}/reviews` + per-review comments
-and inspect for a resolver/resolved field.
-Branches: (a) field present -> record its exact name in the SKILL.md adapter section
-and consume it in `forge threads`; (b) field absent from the API -> fall back to the
-**reply-marker convention**: a thread counts as resolved when its latest reply body
-begins with `[resolved]` (the skill posts that reply when Keldon says a finding is
-handled, and `status` documents the convention); implement (b) in `forge threads`
-behind the same output field so consumers never branch.
-Why: the resolved flag is THE load-bearing claim of the whole design; probe it, don't
-trust docs.
-DONE-WHEN: the SKILL.md adapter section states which branch is in force with the
-probe evidence (endpoint + field name, or its absence) cited.
-
 ### P3 - verbs (each is a `## Verb:` section in SKILL.md; all decisions below are final)
 
-**5. `init-verb`** - `/repos init`, interactive, idempotent.
-Steps it prescribes: `brew install forgejo`; first-run config with
-`HTTP_ADDR = 127.0.0.1` and SQLite (walk the web installer or write app.ini per the
-Forgejo docs - state both, prefer the installer); `brew services start forgejo`;
-create the admin user; create org namespaces (ask which - suggest `personal` +
-`disney`); provision an API token scoped to repo+org and write it to
-`~/.config/repos/forge_token` (0600); scaffold `~/.config/repos/manifest.json`.
-Re-run = verify each step and repair, never reinstall. Every outward step is stated
-to the user before it runs (it is the user's machine, but nothing here is
-destructive).
-DONE-WHEN: section is a complete runbook a fresh session can execute; idempotence
-stated per step.
-
-**6. `open-verb`** - `/repos open [branch] [base]`.
+**7. `open-verb`** - `/repos open [branch] [base]`.
 Defaults: `branch` = current branch; `base` = entry's `base`, else origin's default
 branch. Steps: ensure entry (create on first use, asking which org); `forge
 ensure-repo`; ensure `forge` git remote; push base from origin to forge (note drift:
@@ -242,7 +274,7 @@ URL. Re-run refreshes (push + base re-sync), never duplicates.
 DONE-WHEN: section covers bootstrap, drift note, template/directions consumption, and
 idempotent re-run.
 
-**7. `review-verb`** - `/repos review [pr]`.
+**8. `review-verb`** - `/repos review [pr]`.
 `pr` defaults to the current branch's open forge PR. The session reviews the PR diff
 itself (correctness + the directions' style law), then posts each finding as an
 inline comment via `forge comment` - one comment per finding, root comments only,
@@ -254,7 +286,7 @@ is not a stable consumable contract; revisit only if that changes.)
 DONE-WHEN: section defines finding format, posting mechanics, and the
 default-pr resolution.
 
-**8. `status-verb`** - `/repos status [pr]`.
+**9. `status-verb`** - `/repos status [pr]`.
 Reports: open vs resolved thread counts (from `forge threads`); the export preview
 (each unresolved root comment with file:line); base drift vs origin; preflight
 warnings - AI-attribution trailers in the branch's commits (`git log
@@ -262,7 +294,7 @@ base..branch --format=%B` grepped for `Co-Authored-By:.*Claude|Generated with`),
 any directions violations it can check statically.
 DONE-WHEN: section lists the exact checks and their commands.
 
-**9. `export-verb`** - `/repos export {pr} [dryRun]`.
+**10. `export-verb`** - `/repos export {pr} [dryRun]`.
 `pr` is REQUIRED (the one outward-facing verb - naming it is the guard). Steps:
 preflight (trailer scan + directions check; any hit = STOP and surface, offer the
 history-rewrite fix, never auto-rewrite); `dryRun` -> print branch, base, title,
@@ -277,11 +309,17 @@ staging, and the "nothing resolved transfers" rule stated verbatim.
 
 ### P4 - ship
 
-**10. `manifest-and-bbp`** - Wire into the suite and release.
-Anchor: `MANIFEST_SKILLS` list in [build.py](../build.py) (line ~94): append a
+**11. `manifest-and-bbp`** - Wire into the suite and release.
+Anchor: `MANIFEST_SKILLS` list in [build.py](../build.py): append a
 `repos` entry - invocation `/repos [verb] [args]`, the six verbs with ORDERED params
 and kinds (`kind` from the existing vocabulary: freeform/file/dir/flag; `pr` is
-freeform, `dryRun` is flag, template/directions paths are file). Run `python3
+freeform, `dryRun` is flag, template/directions paths are file, config's `value` is
+freeform). Also in build.py: append a `STAMPS` entry for
+`plugin/skills/repos/SKILL.md` matching `/repos · v\d+\.\d+\.\d+` (the help header
+scaffolded in step 1), and flip the two plans-skill manifest defaults
+`_param("out", False, "dir", "./")` (review and verify entries) to `"plan-dir"` - the
+ride-along for the SKILL.md `[out]`-default change already made in prose on
+2026-08-31 and blocked from code by plan mode at the time. Run `python3
 build.py`, then `python3 build.py --check` and `python3 test/test_modes.py` (both
 must exit 0). Then BBP: bump `plugin/.claude-plugin/plugin.json` to the next
 version, rebuild, `git add -A`, commit ("add /repos skill - local-forge PR
@@ -300,22 +338,19 @@ DONE-WHEN: `--check` and the modes harness exit 0; the new manifest.json carries
 - **No commit-history rewriting by the skill** - preflight detects and instructs;
   the user runs the rewrite.
 - **No changes to the other skills** (`modes`, `plans`, `seedprompt`, `cleancode`)
-  beyond the shared build/manifest files named in step 10.
-- **No Forgejo installation as part of this plan's execution** - the plan ships the
-  skill; running `/repos init` on the machine is a separate, later act.
+  beyond the shared build/manifest files named in step 11.
 
 ## Verification
 
-- `python3 build.py --check` and `python3 test/test_modes.py` exit 0 after step 10.
+- `python3 build.py --check` and `python3 test/test_modes.py` exit 0 after step 11.
 - `python3 plugin/skills/repos/tools/repos_api.py selftest` exits 0.
 - `manifest.json` contains the `repos` skill with six verbs whose names and param
   order match the SKILL.md invocation table exactly.
 - SKILL.md walkthrough: a fresh read of each verb section answers "what exactly do I
   run, in what order, and when do I stop and ask" with no open choices.
-- End-to-end behavioral proof (post-`/repos init`, i.e. after the user runs init on
-  the machine): open a PR on a scratch repo, post a comment, resolve it, post
-  another, export with `dryRun` - the dry run must list exactly the one unresolved
-  comment.
+- End-to-end behavioral proof, live in THIS plan (the forge is up after `run-init`):
+  open a PR on a scratch repo, post a comment, resolve it, post another, export with
+  `dryRun` - the dry run must list exactly the one unresolved comment.
 
 **Escape hatch:** if reality diverges from this plan (an API shape, a build.py
 structure, a doctrine rule), STOP and surface it - don't improvise.

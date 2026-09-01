@@ -64,6 +64,8 @@ STAMPS = [
    re.compile(r"/seedprompt · v\d+\.\d+\.\d+"), "/seedprompt · v{v}"),
   (p("plugin", "skills", "cleancode", "SKILL.md"),
    re.compile(r"/cleancode · v\d+\.\d+\.\d+"), "/cleancode · v{v}"),
+  (p("plugin", "skills", "repos", "SKILL.md"),
+   re.compile(r"/repos · v\d+\.\d+\.\d+"), "/repos · v{v}"),
 ]
 
 README = p("README.md")
@@ -114,10 +116,10 @@ MANIFEST_SKILLS = [
     "verbs": [
       {"name": "write", "params": [_param("name", False, "freeform")]},
       {"name": "review", "params": [_param("plan", True, "plan-file"),
-                                    _param("out", False, "dir", "./"),
+                                    _param("out", False, "dir", "plan-dir"),
                                     _param("model", False, "model")]},
       {"name": "verify", "params": [_param("plan", True, "plan-file"),
-                                    _param("out", False, "dir", "./"),
+                                    _param("out", False, "dir", "plan-dir"),
                                     _param("model", False, "model")]},
       {"name": "update", "params": [_param("plan", True, "plan-file"),
                                     _param("report", True, "file")]},
@@ -179,6 +181,22 @@ MANIFEST_SKILLS = [
                   _param("verdict", False, "freeform"),
                   _param("escrowDir", False, "dir", "./comment_escrow/"),
                   _param("tier", False, "freeform", "internal")]},
+    ],
+  },
+  {
+    "name": "repos",
+    "invocation": "/repos [verb] [args]",
+    "verbs": [
+      {"name": "init", "params": []},
+      {"name": "config", "params": [_param("kind", True, "freeform"),
+                                    _param("origin", False, "freeform"),
+                                    _param("value", False, "freeform")]},
+      {"name": "open", "params": [_param("branch", False, "freeform"),
+                                  _param("base", False, "freeform")]},
+      {"name": "review", "params": [_param("pr", False, "freeform")]},
+      {"name": "status", "params": [_param("pr", False, "freeform")]},
+      {"name": "export", "params": [_param("pr", True, "freeform"),
+                                    _param("dryRun", False, "flag")]},
     ],
   },
 ]

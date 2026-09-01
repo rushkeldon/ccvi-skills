@@ -167,10 +167,12 @@ node tools/plan-check.cjs <file.plan.md>
 `review` and `verify` are *producers*: they write a **report card** (a `.md`). `update`
 is the lone *consumer*: it reads a report and applies it.
 
-**Where the report lands.** Both producers take an `[out]` **directory** (default `./`, the
-cwd) and write `<planbasename>.review.md` or `<planbasename>.verify.md` into it (creating
-the dir if needed). `[out]` always names a *directory*, never a file path; the report is
-named after the plan and lands directly in that directory.
+**Where the report lands.** Both producers take an `[out]` **directory** (default: **the
+plan file's own directory**, so an unadorned review/verify drops its report BESIDE the plan,
+never in the project root) and write `<planbasename>.review.md` or `<planbasename>.verify.md`
+into it (creating the dir if needed). `[out]` always names a *directory*, never a file path;
+the report is named after the plan and lands directly in that directory. Passing `[out]`
+overrides the default — the cwd is never assumed.
 
 **Reports carry a MINIMAL YAML frontmatter — a `plan:` ref + the producing `model:` — then a
 pure-markdown body.** All of a report's **evidence** stays in the **body** as prose: evidence
@@ -256,7 +258,8 @@ unresolved decisions) above.
 whether its todos are done — that's `verify`). Read-only on the plan; writes only the
 report.
 
-`[out]` is a **directory** the report is written into (default `./`); the report lands at
+`[out]` is a **directory** the report is written into (default: the plan file's own
+directory — the report lands beside the plan, never the cwd); the report lands at
 `<planbasename>.review.md` inside it (create the dir if needed). If the user gives an
 `[out]`, treat it as the destination directory.
 
@@ -335,7 +338,8 @@ recorded `status` matches **reality in the codebase**. A `completed` todo must b
 *actually* done — "compiles" ≠ "works"; don't take a status on faith. Read-only on the
 plan; writes only the report.
 
-`[out]` is a **directory** the report is written into (default `./`); the report lands at
+`[out]` is a **directory** the report is written into (default: the plan file's own
+directory — the report lands beside the plan, never the cwd); the report lands at
 `<planbasename>.verify.md` inside it (create the dir if needed). If the user gives an
 `[out]`, treat it as the destination directory.
 
@@ -581,7 +585,7 @@ verbatim, never reflowed (it is byte-identical to the one in the repo README, an
 `build.py --check` enforces that):
 
 ```diagram
-/plans · v0.0.9 — lifecycle verbs for *.plan.md files:
+/plans · v0.0.10 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
