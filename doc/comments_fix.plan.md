@@ -18,7 +18,7 @@ todos:
     status: completed
   - id: bbpi
     content: "Run BBPI: bump plugin.json patch version, python3 build.py, verify --check and test_modes.py green, commit+push, unzip into ~/.ccvi"
-    status: in_progress
+    status: completed
 isProject: false
 ---
 
