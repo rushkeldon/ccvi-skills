@@ -133,7 +133,7 @@ title: "<3-6 words naming what the next session will do>"
 When the verb is blank or unrecognized, reply with exactly this — no preamble, no postscript:
 
 ```text
-/seedprompt · v0.0.10 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
+/seedprompt · v0.0.11 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
 • write [body] — write the pending seed to <memoryRoot>/seedprompt.md (compose from context if no body given)
 • read         — consume the pending seed: print + adopt it, then delete (one-use)
 • show         — print the pending seed's path + contents (or "none pending")

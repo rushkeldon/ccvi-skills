@@ -94,7 +94,7 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.10:
+HELP_TEXT = """Modes · v0.0.11:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent

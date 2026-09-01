@@ -323,7 +323,7 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.10 — local-forge PR pipeline:
+/repos · v0.0.11 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • open [branch] [base]              — push branch to forge, open/refresh local PR

@@ -82,7 +82,7 @@ build/manifest/zip pipeline as `modes`/`plans`/`seedprompt`/`cleancode`.
 The skill is **prose-driven orchestration + one bundled tool**. The SKILL.md
 instructs the session (git operations, drafting, review judgment, conversation);
 deterministic API plumbing lives in a bundled zero-dependency python3 CLI,
-[tools/repos_api.py](../plugin/skills/repos/tools/repos_api.py) (python3 is the
+[tools/repos_api.py](../../plugin/skills/repos/tools/repos_api.py) (python3 is the
 suite's established script runtime - `modes.py` precedent; node is NOT reliably on
 the agent PATH in this environment).
 
@@ -123,9 +123,9 @@ Key structures:
 ## Conventions & assumptions
 
 - **Repo doctrine binds**: tag every code fence; plans live in `doc/`; the release
-  ritual is BBP per [CLAUDE.md](../CLAUDE.md) - bump
+  ritual is BBP per [CLAUDE.md](../../CLAUDE.md) - bump
   `plugin/.claude-plugin/plugin.json` to the **next** version (never hard-code one);
-  any verb/param change must update `MANIFEST_SKILLS` in [build.py](../build.py) in
+  any verb/param change must update `MANIFEST_SKILLS` in [build.py](../../build.py) in
   the same commit.
 - **SKILL.md shape follows the suite**: YAML frontmatter with `name`, `description`
   ("init•config•open•review•status•export - ..."), `argument-hint: "[verb] [args]"`,
@@ -157,7 +157,7 @@ Key structures:
 
 **1. `scaffold-skill`** - Create `plugin/skills/repos/SKILL.md`.
 Anchor: new file; copy the frontmatter shape from
-[plugin/skills/plans/SKILL.md](../plugin/skills/plans/SKILL.md) (frontmatter keys and
+[plugin/skills/plans/SKILL.md](../../plugin/skills/plans/SKILL.md) (frontmatter keys and
 the `verbs:` host-schema comment block). Content: frontmatter; an intro paragraph
 stating the pipeline (local polish -> curated export); the invocation table (the six
 verbs exactly as in Approach); shared sections: **Forge adapter contract**, **Config
@@ -310,7 +310,7 @@ staging, and the "nothing resolved transfers" rule stated verbatim.
 ### P4 - ship
 
 **11. `manifest-and-bbp`** - Wire into the suite and release.
-Anchor: `MANIFEST_SKILLS` list in [build.py](../build.py): append a
+Anchor: `MANIFEST_SKILLS` list in [build.py](../../build.py): append a
 `repos` entry - invocation `/repos [verb] [args]`, the six verbs with ORDERED params
 and kinds (`kind` from the existing vocabulary: freeform/file/dir/flag; `pr` is
 freeform, `dryRun` is flag, template/directions paths are file, config's `value` is
