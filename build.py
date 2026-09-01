@@ -191,6 +191,7 @@ MANIFEST_SKILLS = [
       {"name": "config", "params": [_param("kind", True, "freeform"),
                                     _param("origin", False, "freeform"),
                                     _param("value", False, "freeform")]},
+      {"name": "sync", "params": [_param("force", False, "flag")]},
       {"name": "open", "params": [_param("branch", False, "freeform"),
                                   _param("base", False, "freeform")]},
       {"name": "review", "params": [_param("pr", False, "freeform")]},

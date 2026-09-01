@@ -1,6 +1,6 @@
 ---
 name: repos
-description: init•config•open•review•status•export - iterate a PR to polish on a LOCAL forge (Forgejo), then export the refined result - branch, description, and only the unresolved review comments - to the origin (GitHub) as a pending review, via /repos [verb]. Use when the user issues a /repos directive or asks to open, review, or export a PR through the local forge.
+description: init•config•sync•open•review•status•export - iterate a PR to polish on a LOCAL forge (Forgejo), then export the refined result - branch, description, and only the unresolved review comments - to the origin (GitHub) as a pending review, via /repos [verb]. Use when the user issues a /repos directive or asks to open, review, or export a PR through the local forge.
 argument-hint: "[verb] [args]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
@@ -12,11 +12,12 @@ verbs:
   config:  { order: 2, params: [ { name: kind,   type: string, required: true },
                                  { name: origin, type: string, required: false },
                                  { name: value,  type: string, required: false } ] }
-  open:    { order: 3, params: [ { name: branch, type: string, required: false },
+  sync:    { order: 3, params: [ { name: force,  type: boolean, required: false } ] }
+  open:    { order: 4, params: [ { name: branch, type: string, required: false },
                                  { name: base,   type: string, required: false } ] }
-  review:  { order: 4, params: [ { name: pr, type: string, required: false } ] }
-  status:  { order: 5, params: [ { name: pr, type: string, required: false } ] }
-  export:  { order: 6, params: [ { name: pr,     type: string, required: true },
+  review:  { order: 5, params: [ { name: pr, type: string, required: false } ] }
+  status:  { order: 6, params: [ { name: pr, type: string, required: false } ] }
+  export:  { order: 7, params: [ { name: pr,     type: string, required: true },
                                  { name: dryRun, type: boolean, required: false } ] }
 ---
 
@@ -38,6 +39,7 @@ One entry point - **`/repos [verb] [args]`** - dispatching on the first arg.
 |---|---|
 | `/repos init` | One-time: install + configure the local forge (idempotent re-run = verify & repair) |
 | `/repos config {kind} [origin] [value]` | Per-repo config: `template` \| `directions` \| `base` |
+| `/repos sync [force]` | Push the base and current branch to the forge - no drafting, no PR |
 | `/repos open [branch] [base]` | Push branch to the forge, open/refresh the local PR |
 | `/repos review [pr]` | Claude review of the forge PR → inline forge comments |
 | `/repos status [pr]` | Threads, export preview, preflight warnings |
@@ -273,6 +275,37 @@ identically (manifest row + entry dir; the forge org is asked for on first `open
 **Edge case:** run outside any git repo → no origin to default to; ask for `origin`
 explicitly.
 
+## Verb: sync
+
+**`/repos sync [force]`** - bring the forge current with the origin. Pushes the base
+branch and the current branch to the forge and stops: no drafting, no PR call. Cheap,
+deterministic, and safe to run as often as you like.
+
+**Steps, in order:**
+
+1. **Preflight credentials:** `python3 tools/repos_api.py forge
+   check-git-credentials`. Non-zero exit → STOP and surface its `next_action`; push
+   nothing.
+2. **Require the forge remote.** No `forge` remote → STOP and say to run `/repos open`
+   first; `sync` never creates the repo or wires the remote.
+3. **Sync the base** (always): `git fetch origin <base>` then
+   `git push forge origin/<base>:refs/heads/<base>`. The base can only ever be behind,
+   so this is unconditional. Report the commit range it moved.
+4. **Sync the branch** (fast-forward only): `git push forge <branch>`. On success,
+   report it. On a non-fast-forward rejection - meaning the branch was rebased or
+   amended - **STOP** and report that forcing would bring the forge current but may
+   strand inline review threads anchored to the old commits; name `force` as the way to
+   proceed.
+5. **With `force`:** `git push --force-with-lease forge <branch>`. Never bare `--force`.
+   Say plainly in the report that forge review anchors may now be stale.
+
+**Edge cases:**
+
+- **Base and branch identical** → nothing to do for step 4; the base push covered it.
+- **Branch not yet on the forge** → a normal push creates it; no force needed.
+- **The lease fails under `--force-with-lease`** → someone else pushed to the forge
+  branch; STOP and surface - do not retry with bare `--force`.
+
 ## Verb: open
 
 **`/repos open [branch] [base]`** - push the branch to the forge and open (or
@@ -306,7 +339,8 @@ refresh) the local PR. Defaults: `branch` = the current branch; `base` = the ent
    duplicates). Echo the forge PR URL.
 
 **Idempotent re-run:** pushes again, re-syncs the base, refreshes the drift note;
-the existing PR is reused.
+the existing PR is reused. When only a refresh is wanted, `/repos sync` does steps 4
+and 5 alone - no drafting, and the PR is untouched.
 
 ## Verb: review
 
@@ -333,6 +367,7 @@ comments. `pr` defaults to the current branch's open forge PR.
    what `export` would replay).
 3. **Base drift:** `git fetch origin <base>` then
    `git rev-list --count <branch>..origin/<base>` - commits the base has gained.
+   Drifted? `/repos sync` brings the forge's copy of the base current.
 4. **Preflight warnings:**
    - AI-attribution trailers in the branch's commits:
      `git log <base>..<branch> --format=%B | grep -Ei 'Co-Authored-By:.*Claude|Generated with'`
@@ -372,9 +407,10 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.12 — local-forge PR pipeline:
+/repos · v0.0.13 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
+• sync [force]                      — push base + current branch to the forge; no PR
 • open [branch] [base]              — push branch to forge, open/refresh local PR
 • review [pr]                       — Claude review -> inline forge comments
 • status [pr]                       — threads, export preview, preflight warnings

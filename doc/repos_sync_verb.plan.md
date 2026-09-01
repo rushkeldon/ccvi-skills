@@ -1,38 +1,47 @@
 ---
 humanEngineerDifficulty: 3
 name: "repos: add a sync verb so the forge never lags the origin"
-version: "1.0"
+version: "1.1"
 overview: "The repos skill can already refresh the forge, but only as a side effect of open, which also drafts prose and creates a PR. Add a dedicated sync verb that pushes origin's base and the current branch to the forge and stops there - base always, branch fast-forward-only unless explicitly forced, because force-pushing a rebased branch can strand the inline review comments the forge exists to hold."
 todos:
   - id: sync-verb-section
     content: "Write the `## Verb: sync` section in plugin/skills/repos/SKILL.md, placed between the config and open sections"
-    status: pending
+    status: completed
     phase: "Skill prose"
   - id: verbs-frontmatter
     content: "Add sync to the machine-readable verbs: block in SKILL.md frontmatter and renumber order for open through export"
-    status: pending
+    status: completed
     phase: "Skill prose"
   - id: invocation-table
     content: "Add the sync row to SKILL.md's Invocation table, between config and open"
-    status: pending
+    status: completed
     phase: "Skill prose"
   - id: help-output
     content: "Add the sync bullet to SKILL.md's Help output cheat-sheet"
-    status: pending
+    status: completed
     phase: "Skill prose"
   - id: cross-references
     content: "Point open and status at sync - open's idempotent-re-run note and status's base-drift line"
-    status: pending
+    status: completed
     phase: "Skill prose"
   - id: readme-verb-list
     content: "Add sync to the repos row of README.md's verb list"
-    status: pending
+    status: completed
+    phase: "Skill prose"
+  - id: manifest-skills
+    content: "Add the sync verb to the repos entry of MANIFEST_SKILLS in build.py, between config and open"
+    status: completed
     phase: "Skill prose"
   - id: version-and-build
     content: "Bump the canonical version in plugin/.claude-plugin/plugin.json, run build.py, then build.py --check"
-    status: pending
+    status: completed
     phase: "Verification"
 isProject: false
+updates:
+  - type: review
+    model: "claude-fable-5"
+    at: "2026-09-01T16:48Z"
+    version: "1.1"
 ---
 
 # repos: add a sync verb so the forge never lags the origin
@@ -90,15 +99,19 @@ non-zero exit with its `next_action`, exactly as `open`'s preflight does.
 
 ## Conventions & assumptions
 
-- **Files that change:** `plugin/skills/repos/SKILL.md`, `README.md`, and
-  `plugin/.claude-plugin/plugin.json` (version only). **`tools/repos_api.py` does not
-  change** - `sync` is git-only, and the tool already provides the one call it needs
-  (`forge check-git-credentials`).
-- **Adding a top-level verb touches four surfaces in SKILL.md**, and missing any one leaves
-  the skill internally inconsistent: the `verbs:` frontmatter block, the Invocation table,
-  the verb's own section, and the Help output cheat-sheet. `build.py --check` cross-checks
-  verb names against the prose as a drift tripwire, so a partial edit fails the build rather
-  than shipping quietly.
+- **Files that change:** `plugin/skills/repos/SKILL.md`, `README.md`, `build.py`
+  (the `MANIFEST_SKILLS` repos entry), and `plugin/.claude-plugin/plugin.json` (version
+  only). **`tools/repos_api.py` does not change** - `sync` is git-only, and the tool
+  already provides the one call it needs (`forge check-git-credentials`).
+- **Adding a top-level verb touches four surfaces in SKILL.md** - the `verbs:` frontmatter
+  block, the Invocation table, the verb's own section, and the Help output cheat-sheet -
+  **plus a fifth outside it: `MANIFEST_SKILLS` in `build.py`**, the canonical source of
+  `manifest.json`, the signatures contract ccvi-idea consumes; CLAUDE.md requires that
+  update in the same commit as the SKILL.md change. Note the limits of the tripwire:
+  `build.py --check`'s `manifest_drift()` only verifies that every MANIFEST verb appears
+  in the prose (manifest → prose) - a new verb present in the prose but missing from
+  `MANIFEST_SKILLS` passes `--check` clean, so the manifest step cannot be caught by the
+  build; it has to be done deliberately.
 - **Verb ordering matters.** The `verbs:` block carries an explicit `order:` a host uses to
   render its verb menu. `sync` belongs at **order 3** - after `config`, before `open` -
   because that is its place in the lifecycle: configure, sync, open. Every later verb's
@@ -221,7 +234,8 @@ version line is byte-identical to before.
 ### 5. `cross-references`
 
 **Anchor:** two places. First, `## Verb: open`'s closing note beginning `**Idempotent
-re-run:**`. Second, `## Verb: status`'s numbered item **3. Base drift**.
+re-run:**`. Second, in `## Verb: status`, the numbered item whose literal text is
+`**Base drift:**` (the bold sits on the words, not the number).
 
 - In `open`: after the idempotent-re-run sentence, add that when only a refresh is wanted,
   `sync` does steps 4 and 5 alone without drafting or touching the PR.
@@ -247,7 +261,29 @@ skill does what they need.
 
 **Done when:** the repos row lists seven verbs and the HTML nesting still renders.
 
-### 7. `version-and-build`
+### 7. `manifest-skills`
+
+**Anchor:** in `build.py`, the `"repos"` entry of `MANIFEST_SKILLS` - its `"verbs"` list,
+between the `config` and `open` entries.
+
+Insert, matching the surrounding entries' style:
+
+```python
+      {"name": "sync", "params": [_param("force", False, "flag")]},
+```
+
+**Why:** `MANIFEST_SKILLS` is the canonical source of `manifest.json`, the machine-readable
+signatures contract ccvi-idea consumes to render verb menus and dialogs - a verb absent
+here is invisible to the host even with all four SKILL.md surfaces done. CLAUDE.md requires
+this edit in the same commit as the SKILL.md verb change, and `--check` cannot catch its
+omission (its tripwire runs manifest → prose only), so this step is load-bearing, not
+belt-and-braces.
+
+**Done when:** the repos entry lists seven verbs with `sync` third, and the rebuilt
+`manifest.json` (after step 8's build) shows `sync` with a single optional `force` param of
+kind `flag`.
+
+### 8. `version-and-build`
 
 A new verb is a capability change, so bump the canonical version and re-stamp.
 
@@ -259,8 +295,10 @@ python3 build.py --check
 
 **Why:** the canonical version lives in the plugin manifest and `build.py` stamps it into
 every version display, including each skill's help header. `--check` then verifies the
-displays are in sync and cross-checks verb names against the prose - which is what catches a
-partial registration from steps 2-4.
+displays are in sync and, via its manifest → prose tripwire, that every manifest verb
+(including the new `sync` from step 7) is named in the SKILL.md prose. It does NOT catch a
+verb present in prose but missing from `MANIFEST_SKILLS` - that is why step 7 exists as an
+explicit step.
 
 **Done when:** `python3 build.py --check` exits 0, and `/repos` with no verb prints a
 cheat-sheet containing the `sync` bullet and the new version.
@@ -291,6 +329,9 @@ cheat-sheet containing the `sync` bullet and the new version.
 3. The `verbs:` block parses and reads `order:` 1-7 with `sync` at 3.
 4. `grep -c "sync" plugin/skills/repos/SKILL.md` shows hits in all four required surfaces:
    frontmatter, Invocation table, its own section, Help output.
+4b. The rebuilt `manifest.json` lists `sync` in the repos entry, third, with one optional
+   `force` param - `python3 -c "import json; print([v['name'] for s in
+   json.load(open('manifest.json'))['skills'] if s['name']=='repos' for v in s['verbs']])"`.
 5. Behavioural, on a repo whose forge branch is behind by a fast-forward: `/repos sync`
    pushes base and branch, reports both, and creates no PR - verified by the forge PR count
    being unchanged.
@@ -302,5 +343,5 @@ cheat-sheet containing the `sync` bullet and the new version.
 
 **Escape hatch:** if the skill's structure has moved - a different `verbs:` shape, a
 renumbered runbook, `build.py` no longer cross-checking verb names - **STOP and surface it.
-Do not improvise**; steps 2 through 4 are registration against exact surfaces, and a partial
-registration is worse than none.
+Do not improvise**; steps 2 through 4 and step 7 are registration against exact surfaces,
+and a partial registration is worse than none.

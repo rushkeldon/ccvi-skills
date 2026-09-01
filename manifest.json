@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "skills": [
     {
       "name": "modes",
@@ -426,6 +426,16 @@
               "name": "value",
               "required": false,
               "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "sync",
+          "params": [
+            {
+              "name": "force",
+              "required": false,
+              "kind": "flag"
             }
           ]
         },
