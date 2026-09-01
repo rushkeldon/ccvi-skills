@@ -118,9 +118,7 @@ def forge_threads(args):
     comments = _forge("GET", "/repos/{}/{}/pulls/{}/reviews/{}/comments".format(
       owner, name, args.pr, review["id"])) or []
     for c in comments:
-      line = c.get("position") or 0
-      if not line:
-        line = line_from_hunk(c.get("diff_hunk", ""))
+      line = comment_line(c.get("position"), c.get("diff_hunk"))
       out.append({
         "review_id": review["id"],
         "comment_id": c["id"],
@@ -269,6 +267,19 @@ def line_from_hunk(diff_hunk):
   return cursor
 
 
+def comment_line(position, diff_hunk):
+  """True new-file line for a read-side comment.
+
+  Forgejo's read-side `position` is a DIFF OFFSET, not a file line (probed
+  2026-09-01, v16.0.3: position 157/65 vs true lines 205/70), so hunk
+  arithmetic is authoritative and `position` is only a last-resort stand-in
+  when the hunk is unparseable. Write-side `new_position` is the opposite -
+  it accepts true file lines (probed: reposts anchored correctly).
+  """
+  line = line_from_hunk(diff_hunk or "")
+  return line if line else (position or 0)
+
+
 # --------------------------------------------------------------- github side
 
 def _gh(gh_args, input_bytes=None):
@@ -357,10 +368,22 @@ def selftest(_args):
       failures.append({
         "case": "next_action({}, {}, {})".format(helper, keychain, ls_remote),
         "expected": expected, "got": got})
+  cl_cases = [
+    # (name, position, diff_hunk, expected)
+    ("hunk wins over position", 157, "@@ -0,0 +202,4 @@\n+a\n+b\n+c\n+d", 205),
+    ("position-only fallback",  65,  "not a hunk", 65),
+    ("neither",                 None, "", 0),
+    ("position None, hunk ok",  None, "@@ -0,0 +1,2 @@\n+a\n+b", 2),
+  ]
+  for name, position, hunk, expected in cl_cases:
+    got = comment_line(position, hunk)
+    if got != expected:
+      failures.append({"case": name, "expected": expected, "got": got})
   if failures:
     print(json.dumps({"selftest": "FAIL", "failures": failures}))
     sys.exit(1)
-  print(json.dumps({"selftest": "OK", "cases": len(cases) + len(na_cases)}))
+  print(json.dumps({"selftest": "OK",
+                    "cases": len(cases) + len(na_cases) + len(cl_cases)}))
 
 
 # ---------------------------------------------------------------------- main

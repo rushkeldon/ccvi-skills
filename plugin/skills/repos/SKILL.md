@@ -143,8 +143,10 @@ github export     --repo R --branch B --base BASE --title T --body-file F
  "unresolved": 0, "resolved": 1}
 ```
 
-`line` prefers the API's `position`; where absent it is derived from the comment's
-`diff_hunk` by `@@`-header arithmetic (`line_from_hunk`, covered by `selftest`).
+`line` is the TRUE new-file line, derived from the comment's `diff_hunk` by
+`@@`-header arithmetic (`comment_line`/`line_from_hunk`, covered by `selftest`);
+the API's `position` is a diff offset, not a file line (probed v16.0.3), and is
+used only as a stand-in when the hunk is unparseable.
 `resolved` is `resolver != null` per the probe above. Export consumers keep only
 `threads[]` entries with `resolved == false`.
 
@@ -352,6 +354,11 @@ comments. `pr` defaults to the current branch's open forge PR.
 - **Each finding = one root inline comment** via `forge comment --repo R --pr N
   --path P --line L --body-file F`: what's wrong, why it matters, and a one-line
   suggested action at the end. Phrased per the stage directions.
+- **Posted comments cannot be edited** - the forge API has no PATCH for review
+  comments (regardless of token scope; probed v16.0.3). To amend one: DELETE
+  `/repos/{owner}/{repo}/pulls/{index}/reviews/{id}/comments/{comment}` (works
+  with the provisioned scopes), then repost via `forge comment`. The comment id
+  changes; the thread's resolved state starts over.
 - No severity theater. A finding the session is unsure of says so plainly.
 - **Chat output is a summary; the forge comments are the durable artifact.**
 - (Wrapping the built-in /code-review skill was considered and REJECTED for v1: its
@@ -407,7 +414,7 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.13 — local-forge PR pipeline:
+/repos · v0.0.14 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • sync [force]                      — push base + current branch to the forge; no PR
