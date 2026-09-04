@@ -22,6 +22,7 @@ Subcommands:
 import argparse
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import urllib.error
@@ -107,10 +108,40 @@ def forge_pr(args):
                     "existing": False}))
 
 
+def _head_remap(commit_id, head_sha, path, line):
+  """head_line/outdated for one comment, via local git in the cwd (the clone).
+
+  Ladder: no basis -> outdated; anchor == head -> unchanged; anchor commit or
+  head-side path missing locally (force-push+gc, rename, delete) -> outdated;
+  else remap_line over `git diff --unified=0`. Any git failure -> outdated,
+  never a guess and never a crash.
+  """
+  if not commit_id or not head_sha:
+    return (None, True)
+  if commit_id == head_sha:
+    return (line, False)
+  def _git_ok(cmd):
+    return subprocess.run(cmd, capture_output=True).returncode == 0
+  if not _git_ok(["git", "cat-file", "-e", commit_id]):
+    return (None, True)
+  if not _git_ok(["git", "cat-file", "-e", "{}:{}".format(head_sha, path)]):
+    return (None, True)
+  res = subprocess.run(
+    ["git", "diff", "--unified=0", commit_id, head_sha, "--", path],
+    capture_output=True)
+  if res.returncode != 0:
+    return (None, True)
+  return remap_line(line, res.stdout.decode(errors="replace"))
+
+
 def forge_threads(args):
   """Reviews + inline comments; each comment carries path, line info, body, and
-  resolved (Forgejo: resolver != null - probed 2026-08-31, v16.0.3)."""
+  resolved (Forgejo: resolver != null - probed 2026-08-31, v16.0.3).
+  line is as-of the comment's anchor commit; head_line re-anchors it to the
+  current PR head (null + outdated=true when the anchored code was rewritten)."""
   owner, name = args.repo.split("/", 1)
+  pr = _forge("GET", "/repos/{}/{}/pulls/{}".format(owner, name, args.pr)) or {}
+  head_sha = (pr.get("head") or {}).get("sha", "")
   reviews = _forge("GET", "/repos/{}/{}/pulls/{}/reviews".format(
     owner, name, args.pr)) or []
   out = []
@@ -119,11 +150,15 @@ def forge_threads(args):
       owner, name, args.pr, review["id"])) or []
     for c in comments:
       line = comment_line(c.get("position"), c.get("diff_hunk"))
+      head_line, outdated = _head_remap(c.get("commit_id", ""), head_sha,
+                                        c["path"], line)
       out.append({
         "review_id": review["id"],
         "comment_id": c["id"],
         "path": c["path"],
         "line": line,
+        "head_line": head_line,
+        "outdated": outdated,
         "body": c["body"],
         "resolved": c.get("resolver") is not None,
         "author": c["user"]["login"],
@@ -268,16 +303,44 @@ def line_from_hunk(diff_hunk):
 
 
 def comment_line(position, diff_hunk):
-  """True new-file line for a read-side comment.
+  """New-file line for a read-side comment, as of the comment's OWN anchor
+  commit (commit_id) - NOT the PR head; remap_line maps it to head.
 
-  Forgejo's read-side `position` is a DIFF OFFSET, not a file line (probed
-  2026-09-01, v16.0.3: position 157/65 vs true lines 205/70), so hunk
-  arithmetic is authoritative and `position` is only a last-resort stand-in
-  when the hunk is unparseable. Write-side `new_position` is the opposite -
-  it accepts true file lines (probed: reposts anchored correctly).
+  Forgejo's read-side `position` varies by provenance: a DIFF OFFSET for
+  UI-created comments (probed 2026-09-01, v16.0.3: position 157/65 vs true
+  lines 205/70), but API-written comments echo `new_position` back as a true
+  file line (probed 2026-09-03). So hunk arithmetic is authoritative and
+  `position` is only a last-resort stand-in when the hunk is unparseable.
+  Write-side `new_position` accepts true file lines (probed: reposts anchored
+  correctly).
   """
   line = line_from_hunk(diff_hunk or "")
   return line if line else (position or 0)
+
+
+def remap_line(line, diff_text):
+  """Map a file line in the diff's OLD side to the NEW side.
+
+  Walks the @@ -a,b +c,d @@ hunk headers of a --unified=0 diff, accumulating
+  the net delta of hunks strictly above `line`. A hunk that CONTAINS the line
+  (a <= line < a + b) means the anchored code was rewritten: outdated.
+  Pure-insertion hunks (b == 0) insert AFTER old line a, so line == a does not
+  move - hence max(b, 1) in the above-test. Returns (head_line, outdated);
+  outdated=True carries head_line=None.
+  """
+  delta = 0
+  for m in re.finditer(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@",
+                       diff_text, re.MULTILINE):
+    a = int(m.group(1))
+    b = 1 if m.group(2) is None else int(m.group(2))
+    d = 1 if m.group(4) is None else int(m.group(4))
+    if a + max(b, 1) <= line:
+      delta += d - b
+    elif a <= line < a + b:
+      return (None, True)
+    else:
+      break
+  return (line + delta, False)
 
 
 # --------------------------------------------------------------- github side
@@ -302,6 +365,11 @@ def github_export(args):
   `event` field - that is what leaves it PENDING for a human to submit.
   """
   comments = json.loads(pathlib.Path(args.comments_file).read_text())
+  stale = [c["path"] for c in comments if c.get("outdated")]
+  if stale:
+    _die("comments file contains outdated entries",
+         "anchored code was rewritten; resolve or reword on the forge: "
+         + ", ".join(stale))
   description = pathlib.Path(args.body_file).read_text()
   review_comments = [{"path": c["path"], "line": c["line"],
                       "side": c.get("side", "RIGHT"), "body": c["body"]}
@@ -379,11 +447,28 @@ def selftest(_args):
     got = comment_line(position, hunk)
     if got != expected:
       failures.append({"case": name, "expected": expected, "got": got})
+  remap_cases = [
+    # (name, line, diff_text, expected (head_line, outdated))
+    ("no hunks - unchanged",        121, "",                              (121, False)),
+    ("insertion above shifts",      199, "@@ -70,1 +70,2 @@\n-x\n+y\n+z", (200, False)),
+    ("anchor inside hunk",          70,  "@@ -70,1 +70,2 @@\n-x\n+y\n+z", (None, True)),
+    ("pure-insert at anchor line",  70,  "@@ -70,0 +71,2 @@\n+y\n+z",     (70, False)),
+    ("pure-insert line below it",   71,  "@@ -70,0 +71,2 @@\n+y\n+z",     (73, False)),
+    ("deletion above shifts down",  199, "@@ -100,3 +99,0 @@\n-a\n-b\n-c",(196, False)),
+    ("inside deleted range",        101, "@@ -100,3 +99,0 @@\n-a\n-b\n-c",(None, True)),
+    ("hunk below - stops",          50,  "@@ -70,1 +70,2 @@\n-x\n+y\n+z", (50, False)),
+  ]
+  for name, line, diff_text, expected in remap_cases:
+    got = remap_line(line, diff_text)
+    if got != expected:
+      failures.append({"case": name, "expected": list(expected),
+                       "got": list(got)})
   if failures:
     print(json.dumps({"selftest": "FAIL", "failures": failures}))
     sys.exit(1)
   print(json.dumps({"selftest": "OK",
-                    "cases": len(cases) + len(na_cases) + len(cl_cases)}))
+                    "cases": len(cases) + len(na_cases) + len(cl_cases)
+                    + len(remap_cases)}))
 
 
 # ---------------------------------------------------------------------- main

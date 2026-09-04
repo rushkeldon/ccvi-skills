@@ -18,7 +18,7 @@ the project's plan directory, which is what `<docDir>` resolves to - it is an in
 that term, never a rung of its own. In both cases the **tag is the contract**; the
 settings keys behind them are host-local.
 
-Current version: ccvi-skills · v0.0.14
+Current version: ccvi-skills · v0.0.15
 
 ## The skills
 

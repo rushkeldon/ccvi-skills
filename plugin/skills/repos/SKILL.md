@@ -138,15 +138,24 @@ github export     --repo R --branch B --base BASE --title T --body-file F
 ```json
 {"pr": 1,
  "threads": [{"review_id": 1, "comment_id": 2, "path": "spike.txt", "line": 2,
+              "head_line": 2, "outdated": false,
               "body": "...", "resolved": true, "author": "rushkeldon",
               "created_at": "..."}],
  "unresolved": 0, "resolved": 1}
 ```
 
-`line` is the TRUE new-file line, derived from the comment's `diff_hunk` by
-`@@`-header arithmetic (`comment_line`/`line_from_hunk`, covered by `selftest`);
-the API's `position` is a diff offset, not a file line (probed v16.0.3), and is
-used only as a stand-in when the hunk is unparseable.
+`line` is the new-file line **as of the comment's own anchor commit**
+(`commit_id`), derived from the frozen `diff_hunk` by `@@`-header arithmetic
+(`comment_line`/`line_from_hunk`, covered by `selftest`) - still the right value
+for the DELETE + repost amend path, but NOT the current line once later commits
+shift the file. `head_line` is that line re-anchored to the current PR head via
+local `git diff` (`remap_line`, also selftest-covered); it is `null` when
+`outdated: true`, meaning the anchored code was itself rewritten. Export
+consumers keep unresolved entries and replay by `head_line`, never `line`.
+The API's `position` is only a stand-in when the hunk is unparseable: its
+meaning varies by provenance (probed v16.0.3 - a diff offset for UI-created
+comments, but API-written comments echo `new_position` back as a true file
+line), so the hunk arithmetic stays authoritative.
 `resolved` is `resolver != null` per the probe above. Export consumers keep only
 `threads[]` entries with `resolved == false`.
 
@@ -370,8 +379,10 @@ comments. `pr` defaults to the current branch's open forge PR.
 **`/repos status [pr]`** - the dashboard. `pr` defaults like `review`. Reports:
 
 1. **Thread counts:** open vs resolved, from `forge threads --repo R --pr N`.
-2. **Export preview:** each unresolved root comment as `path:line - body` (exactly
-   what `export` would replay).
+2. **Export preview:** each unresolved root comment as `path:head_line - body`
+   (exactly what `export` would replay). An `outdated: true` thread renders as
+   `path - body [OUTDATED - will be excluded from export]`; the summary counts
+   replayable vs outdated.
 3. **Base drift:** `git fetch origin <base>` then
    `git rev-list --count <branch>..origin/<base>` - commits the base has gained.
    Drifted? `/repos sync` brings the forge's copy of the base current.
@@ -394,7 +405,13 @@ review.
    commands) but NEVER run it - the user rewrites, then re-invokes export.
 2. **Collect the payload:** `forge threads`, keep `resolved == false` entries only,
    root comments only; the forge PR's title + description **verbatim** (no template
-   re-application).
+   re-application). Each replayed entry's `line` value in the comments JSON is the
+   thread's **`head_line`** (the head-anchored line - never the as-of-comment
+   `line`). Any entry with `outdated: true` is **excluded** from the JSON, with a
+   warning printed per exclusion naming its `path` and the first line of its
+   `body` - the user resolves or rewords those comments on the forge first.
+   (`github export` also refuses a comments file carrying `outdated` entries -
+   belt and braces.)
 3. **`dryRun`:** print branch, base, title, description, and every surviving
    comment with its `path:line` anchor - via `github export ... --dry-run` - touch
    nothing, end.
@@ -414,7 +431,7 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.14 — local-forge PR pipeline:
+/repos · v0.0.15 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • sync [force]                      — push base + current branch to the forge; no PR
