@@ -130,7 +130,10 @@ forge check-git-credentials [--remote NAME]     helper + keychain + ls-remote pr
                                                 -> {ok, next_action}; exit 0 iff ok
 github export     --repo R --branch B --base BASE --title T --body-file F
                   --comments-file J [--dry-run]  push is the CALLER's job; creates the
-                                                origin PR + ONE pending review
+                                                origin PR + ONE pending review;
+                                                replays comments by head_line (required);
+                                                gh runs with GH_HOST derived from the
+                                                origin remote (a preset GH_HOST wins)
 ```
 
 **`forge threads` output shape** (the export pipeline's input):
@@ -405,13 +408,14 @@ review.
    commands) but NEVER run it - the user rewrites, then re-invokes export.
 2. **Collect the payload:** `forge threads`, keep `resolved == false` entries only,
    root comments only; the forge PR's title + description **verbatim** (no template
-   re-application). Each replayed entry's `line` value in the comments JSON is the
-   thread's **`head_line`** (the head-anchored line - never the as-of-comment
-   `line`). Any entry with `outdated: true` is **excluded** from the JSON, with a
-   warning printed per exclusion naming its `path` and the first line of its
-   `body` - the user resolves or rewords those comments on the forge first.
-   (`github export` also refuses a comments file carrying `outdated` entries -
-   belt and braces.)
+   re-application). Comments-JSON entries carry the thread fields as `forge
+   threads` emitted them - `github export` replays each at its **`head_line`**
+   (the head-anchored line - never the as-of-comment `line`) and **refuses** an
+   entry with no `head_line`, no silent fallback. Any entry with
+   `outdated: true` is **excluded** from the JSON, with a warning printed per
+   exclusion naming its `path` and the first line of its `body` - the user
+   resolves or rewords those comments on the forge first. (`github export` also
+   refuses a comments file carrying `outdated` entries - belt and braces.)
 3. **`dryRun`:** print branch, base, title, description, and every surviving
    comment with its `path:line` anchor - via `github export ... --dry-run` - touch
    nothing, end.
@@ -431,7 +435,7 @@ When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.15 — local-forge PR pipeline:
+/repos · v0.0.16 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • sync [force]                      — push base + current branch to the forge; no PR

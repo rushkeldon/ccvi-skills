@@ -21,6 +21,7 @@ Subcommands:
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -345,10 +346,34 @@ def remap_line(line, diff_text):
 
 # --------------------------------------------------------------- github side
 
+def remote_host(url):
+  """Hostname from a git remote URL - scp-like (git@host:org/repo.git),
+  scheme://[user@]host[:port]/... (https, ssh), with or without .git."""
+  url = (url or "").strip()
+  m = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/]+@)?([^:/]+)", url)
+  if m:
+    return m.group(1)
+  m = re.match(r"^(?:[^@/]+@)?([^:/]+):", url)
+  if m:
+    return m.group(1)
+  return ""
+
+
 def _gh(gh_args, input_bytes=None):
+  # gh's API paths here are host-relative; the gh BINARY defaults to
+  # github.com when GH_HOST is unset (a shell function deriving it is not
+  # inherited by a subprocess). Derive it from the origin remote - but never
+  # override a GH_HOST the caller set explicitly.
+  env = os.environ.copy()
+  if not env.get("GH_HOST"):
+    origin = subprocess.run(["git", "remote", "get-url", "origin"],
+                            capture_output=True, text=True)
+    host = remote_host(origin.stdout) if origin.returncode == 0 else ""
+    if host:
+      env["GH_HOST"] = host
   try:
     res = subprocess.run(["gh"] + gh_args, capture_output=True,
-                         input=input_bytes, check=True)
+                         input=input_bytes, check=True, env=env)
   except FileNotFoundError:
     _die("gh CLI not found", "install GitHub CLI and run: gh auth login")
   except subprocess.CalledProcessError as e:
@@ -371,9 +396,16 @@ def github_export(args):
          "anchored code was rewritten; resolve or reword on the forge: "
          + ", ".join(stale))
   description = pathlib.Path(args.body_file).read_text()
-  review_comments = [{"path": c["path"], "line": c["line"],
-                      "side": c.get("side", "RIGHT"), "body": c["body"]}
-                     for c in comments]
+  # Replay by head_line, REQUIRED - no fallback to the as-of-anchor `line`
+  # (a silent fallback to the stale field is how the off-by-one shipped once).
+  review_comments = []
+  for c in comments:
+    if "head_line" not in c or c["head_line"] is None:
+      _die("comments file entry has no head_line",
+           c.get("path", "?")
+           + " - re-run forge threads and rebuild the comments file")
+    review_comments.append({"path": c["path"], "line": c["head_line"],
+                            "side": c.get("side", "RIGHT"), "body": c["body"]})
   pr_payload = {"title": args.title, "head": args.branch, "base": args.base,
                 "body": description}
   if args.dry_run:
@@ -463,12 +495,24 @@ def selftest(_args):
     if got != expected:
       failures.append({"case": name, "expected": list(expected),
                        "got": list(got)})
+  rh_cases = [
+    # (name, remote url, expected host)
+    ("scp-like",       "git@github.twdcgrid.net:org/repo.git", "github.twdcgrid.net"),
+    ("https",          "https://github.twdcgrid.net/org/repo", "github.twdcgrid.net"),
+    ("ssh with port",  "ssh://git@host:22/org/repo.git",       "host"),
+    ("https .git",     "https://github.com/org/repo.git",      "github.com"),
+    ("empty",          "",                                     ""),
+  ]
+  for name, url, expected in rh_cases:
+    got = remote_host(url)
+    if got != expected:
+      failures.append({"case": name, "expected": expected, "got": got})
   if failures:
     print(json.dumps({"selftest": "FAIL", "failures": failures}))
     sys.exit(1)
   print(json.dumps({"selftest": "OK",
                     "cases": len(cases) + len(na_cases) + len(cl_cases)
-                    + len(remap_cases)}))
+                    + len(remap_cases) + len(rh_cases)}))
 
 
 # ---------------------------------------------------------------------- main
