@@ -1,7 +1,7 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.16",
-  "description": "The CCVI family's skill suite — persistent response modes via /modes [verb], plan lifecycle verbs via /plans [verb], and one-use session hand-off seeds via /seedprompt [verb].",
+  "version": "0.0.17",
+  "description": "The CCVI family's skill suite \u2014 persistent response modes via /modes [verb], plan lifecycle verbs via /plans [verb], and one-use session hand-off seeds via /seedprompt [verb].",
   "author": {
     "name": "Keldon Rush",
     "email": "keldon@appcloud9.com"

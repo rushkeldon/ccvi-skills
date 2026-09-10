@@ -277,18 +277,34 @@ def main():
     # the six bullets added in the portability pass, plus the write-don't-build and
     # drain clauses — one stable substring each, against the emitted notes
     LAW_AL = modes_mod.LAW["agent-loop"]
+    # IN THE LAW — needed EVERY turn or EVERY spawn, so it must survive without a lookup.
     check("aloop/law-status-flips", "flip the unit to in_progress" in LAW_AL)
     check("aloop/law-arm-first", "arm FIRST on seeded and resumed turns" in LAW_AL)
-    check("aloop/law-never-cron", "never cron for the heartbeat" in LAW_AL)
     check("aloop/law-reentry-text", "never a generic sentinel" in LAW_AL)
     check("aloop/law-worker-fence", "NEVER add-all" in LAW_AL)
     check("aloop/law-resource-gates", "gate exclusive resources" in LAW_AL)
-    check("aloop/law-write-dont-build", "leave it UNBUILT" in LAW_AL)
-    check("aloop/law-rollover-drain", "drain in-flight work first" in LAW_AL)
-    check("aloop/law-log-ladder", "<ccvi-autonomy-log>" in LAW_AL)
-    check("aloop/law-log-fallback", "<docDir>/logs/autonomy" in LAW_AL)
-    check("aloop/law-log-hands-off-git", "NEVER a .gitignore edit" in LAW_AL)
-    check("aloop/law-plan-surfacing", "plan surfacing" in LAW_AL)
+    # NEW — the measurement discipline. The first is a note (nothing forces it); the second
+    # is the load-bearing half, because it puts the obligation in the OUTPUT FORMAT, where a
+    # bare number is visibly incomplete to any reader rather than failing silently.
+    check("aloop/law-spec-before-tool", "BEFORE NAMING ANY TOOL" in LAW_AL)
+    check("aloop/law-number-carries-check",
+          "WITH THE OUTPUT OF ITS CHECK BESIDE IT" in LAW_AL)
+    check("aloop/law-retooling-is-work", "re-tooling produces nothing visible" in LAW_AL)
+    # RELOCATED TO THE BODY — needed ONCE per engagement or on a rare event, so it is lookup
+    # rather than law. These assertions still guarantee the lesson EXISTS; they no longer
+    # guarantee it is in working memory on wake. That is a deliberate trade for density:
+    # see "Where the mechanism went" in SKILL.md.
+    check("aloop/body-never-cron", "never cron for the heartbeat" in md)
+    check("aloop/body-write-dont-build", "leave it UNBUILT" in md)
+    check("aloop/body-rollover-drain", "drain in-flight work first" in md)
+    check("aloop/body-log-ladder", "<ccvi-autonomy-log>" in md)
+    check("aloop/body-log-fallback", "<docDir>/logs/autonomy" in md)
+    check("aloop/body-log-hands-off-git", "NEVER a .gitignore edit" in md)
+    check("aloop/body-plan-surfacing", "plan surfacing" in md)
+    # the instrument order-of-operations the measurement bullet points at
+    check("aloop/body-instrument-steps", "Choosing an instrument" in md)
+    check("aloop/body-instrument-spec-numbers", "A spec with no numbers in it is not a spec" in md)
+    check("aloop/body-mechanism-relocation", "Where the mechanism went" in md)
     # SKILL.md prose (not LAW): the doc-dir hint and the phrase keeping it out of rung 1
     check("aloop/docdir-hint", "<ccvi-doc-dir>" in md,
           "the <ccvi-doc-dir> hint is missing from the ladder prose")
@@ -341,8 +357,9 @@ def main():
     n = notes_of(out)
     check("pct/notes-rollover", "• rollover threshold — when the mode entry carries a percentage" in n,
           "rollover bullet missing from the agent-loop law")
-    check("pct/notes-pace", "• pace hand-offs — sustained cadence, never bursts" in n,
-          "pacing bullet missing from the agent-loop law")
+    # RELOCATED: hand-off pacing matters only at a hand-off, so it is body lookup now.
+    check("pct/body-pace", "pace hand-offs" in open(SKILL_MD, encoding="utf-8").read(),
+          "pacing guidance missing from SKILL.md")
     # refuse out-of-range / non-numeric: non-zero exit (-> model asks), state untouched
     for bad in ("agent-loop 19", "agent-loop 5", "agent-loop 100", "agent-loop abc"):
         out, rc, final = run(bad, seed=AGENT_ONLY)

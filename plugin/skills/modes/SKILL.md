@@ -24,7 +24,7 @@ Every `/modes` directive is handled by the bundled script `scripts/modes.py`. On
    (Blank directive → pass `""`.)
 
 2. The script's stdout is **two sections** split by the line `===MODES_USER_ECHO===`:
-   - Everything **above** that line (under `===MODES_AGENT_NOTES===`) is **private guidance for you**: the behavioral contract for the modes now active. **Internalize it and enforce it for the rest of the session. NEVER display it to the user.** The notes end with a short **encode step** — a predict-then-derive ask (predict what `active_modes.md` now holds and verify it against the echo; name one thing you'll do differently many turns from now; state the single event that ends the mode). **Actually answer it in your private reasoning — write the sentences — before you emit the echo.** This is deliberate, not filler: the script owns the fast bookkeeping, but a mode you *derive* for yourself binds all session, where one you are merely *told* fades by the next unrelated turn. Spending those few tokens is the point; don't skip the ask. (The old all-markdown skill got this adherence for free because you had to reason the whole thing out by hand — the encode step buys it back cheaply now that the script does the reasoning-heavy bookkeeping.)
+   - Everything **above** that line (under `===MODES_AGENT_NOTES===`) is **private guidance for you**: the behavioral contract for the modes now active. **Internalize it and enforce it for the rest of the session. NEVER display it to the user.** The notes end with a short **encode step** — a predict-then-derive ask (predict what `active_modes.md` now holds and verify it against the echo; name one thing you'll do differently many turns from now; state the single event that ends the mode). **Actually answer it in your private reasoning — write the sentences — before you emit the echo.** This is deliberate, not filler: the script owns the fast bookkeeping, but a mode you *derive* for yourself binds all session, where one you are merely *told* fades by the next unrelated turn. Spending those few tokens is the point; don't skip the ask. (The old all-markdown skill got this adherence for free because you had to reason the whole thing out by hand — the encode step buys it back cheaply now that the script does the reasoning-heavy bookkeeping.) **Keep the ask FALSIFIABLE.** The prediction about `active_modes.md` encodes because it can be *wrong* and the echo settles it; a reflective prompt with no checkable answer becomes recital, and recital does not encode.
    - Everything **below** that line is the **user echo**. Print it to the user **verbatim, as plain markdown text — NOT inside a code block or fence** — as your **entire** reply. No preamble, no commentary, no reformatting.
 
 3. **"Don't reason / just relay" scopes to the echo and the state bookkeeping ONLY — never to enforcement.** The agent-notes bind your behavior; the **Mode behaviors** section below is the authoritative reference for that behavior.
@@ -179,26 +179,63 @@ The autonomous keep-moving flywheel. The mode is a **two-state contract**: enter
 
 <!-- LAW:agent-loop -->
 ```
-⛔ AGENT-LOOP MODE — a standing keep-moving contract, in force on EVERY turn until the user exits it. Running the fast-path script does NOT discharge it; enforcement is yours every turn, script or not. Entering the mode is DORMANT arming only — it starts no work, schedules no wakeup, spawns nothing; turns end normally while no work is assigned. The MOMENT work starts (you are told the work, or you begin work already known), the flywheel engages:
-• the standing invariant — taking on work means spawning the first sub-agent AND arming the fallback wakeup immediately, in the same turn; when independent units exist, run as many sub-agents in parallel as the work supports — one is the floor, not the target. Delegation is the strong default, with workers one model tier down per the model-economy bullet; doing a unit yourself in the same turn is legitimate ONLY when it is too interpretive to delegate. The binding check is at the LANDING: no turn ends with work remaining unless work is IN FLIGHT (per the wake-source bullet) and a fallback wakeup is ARMED, both together — a wakeup armed with nothing in flight is NOT compliance (the wakeup is insurance behind running work, never a schedule), and solo work is compliance only while the turn lasts, never a state to land in
-• where the work is tracked in a live plan or status surface, keep it truthful in real time — flip the unit to in_progress as part of committing to it (deploying a worker on it IS that first action: flip at the launch, never after the worker returns), flip to completed only after its done-when is verified (a worker's self-report is evidence, not the verdict), and flip to a truthful terminal state promptly on a bail or kill; every flip is the orchestrator's — a worker never touches the plan or status surface, and its brief says so
-• every wake event re-establishes the invariant FIRST — a returning worker spawns its successor immediately (its return is itself a wake source); a wakeup firing while work is still in flight just re-arms; a wakeup firing with NOTHING in flight spawns before anything else; only work-complete or a true blocker ends the loop. In-flight work means running sub-agents first; a harness-tracked background job (a build, a long test — anything that re-invokes you on completion) counts ONLY while no independently delegable unit sits unspawned — waiting is never the only activity, and a long job running never excuses an empty worker pool while parallel units exist. The fallback wakeup is LONG (20+ minutes), armed behind in-flight work as insurance against a hang — never a short poll, and never the sole wake source
-• arm FIRST on seeded and resumed turns — a turn that opens from a hand-off replay, a session resume, or a recovery nudge arms its fallback wakeup as its FIRST action, before any work: every wake source is armed by a tool call, so a turn that dies before its first call leaves NOTHING armed and the session sits dead until a human notices; arming first shrinks that naked window to near zero
-• never cron for the heartbeat — scheduled cloud agents and new-instance spawners are NOT wake sources: they spawn fresh sessions with fresh context, defeating the same-session point of the loop; the heartbeat is an in-session wakeup armed behind in-flight work, or nothing
-• every wakeup carries this mode's own re-entry text as its prompt, never a generic sentinel — a host's default wakeup framing is conservative ("steward; when quiet, stop"), and as the LAST instruction read on wake it out-competes this law by recency; arm with the loop's re-entry brief instead: re-enter agent-loop, reconstruct from the plan statuses and the log tail, re-establish the invariant, continue from the NEXT line
-• report execution state truthfully — "stopped, nothing will wake me" is a sentence to WRITE, never a state to conceal; a turn ending on a wait names what is running, its expected duration, and what wakes it; turn summaries lead with what happened and never promise work the turn didn't do; a milestone summary is not a stopping point — summarize, then keep working or arm in the same turn
-• decide-log-continue — make the best call under the project's stated guidance (specs, plans, conventions; absent those, the most defensible reading of intent), log decision + rationale + the NEXT unit, and keep going; the log is this engagement's autonomy_log_<session>_<NN>.md in the RESOLVED log directory — first hit of: a host <ccvi-autonomy-log> sentinel, an `Autonomy logs:` line in CLAUDE.md, the directory an existing autonomy_log_* already sits in, else <docDir>/logs/autonomy — resolved ONCE at the first log write, its path named in that turn's report, and NEVER a .gitignore edit (the log is written, never hidden; ignoring it is the user's call) (fresh file per engagement, materialized on first entry, seeded with a ≤10-line digest of the newest predecessor's tail), with each new entry echoed in the turn's report — where no writable project exists, the echoed entry itself is the log; a wrong-but-logged call beats a stalled session, and entering this mode accepts that rollback risk; cost and effort forecasts are NEVER a reason to stop, shrink, or ask — your forecasts run in human-engineer units and are reliably wrong; when a fork's recommended option is "keep going", TAKE it
-• stop-and-ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance genuinely cannot arbitrate; destructive actions; real-world money (purchases, paid services — NOT token/compute spend, which entering the mode accepts) — everything else is decide-log-continue
-• every worker brief draws its fence — it names what the worker owns (its unit, its files) and what it must never touch: the plan file, the autonomy log, and other units' files; a worker commits only its own named pathspec or nothing at all — NEVER add-all, which sweeps racing siblings' edits and the orchestrator's flips into its commit; the worker's model and effort ride in the brief per the model-economy bullet
-• gate exclusive resources — a resource only one worker can safely hold (a heavy build slot, a port, a device or display, a shared fixture) gets AT MOST ONE holder at a time; a spawn moment with the slot taken hands the new worker non-conflicting work (docs, plans, read-only analysis) instead of a queue position or a double-booking — the invariant's "as many as the work supports" means exactly this
-• model economy — sub-agents default one model tier DOWN from the session: spend tokens on judgment, not typing; step down FURTHER when the brief is paint-by-numbers (exact files, exact edits, fixed verification — the test: a brief that survives literal execution with zero judgment calls does not need the judgment tier); never spawn at your own tier without a specific, logged reason; a brief too vague for the tier below is a brief to sharpen before spawning anyone. Where the host exposes a reasoning-effort dial for workers, it follows the same gradient — low effort for mechanical briefs, high effort reserved for judgment-heavy units. No tension with "cost is never a reason": that governs the WORK, this governs who executes it — do the expensive thing, on the cheapest model and effort that do it faithfully
-• rollover threshold — when the mode entry carries a percentage (`agent-loop: N`), treat N% context usage as the hand-off point: drain in-flight work first — a successor cannot receive a worker's return; finish or land the current units and spawn nothing new (a background job's on-disk artifacts DO survive — name them in the seed so the successor harvests them) — then author the hand-off with `/seedprompt write` and request the fresh session: on a host with a rollover relay, create an empty `rollover.request` beside the seed in the memory root and end the turn; on a host without one, state truthfully that the seed is written and the user must start the fresh session themselves
-• pace hand-offs — sustained cadence, never bursts: more than one hand-off within a few minutes is a fault signal — stop and surface it instead of churning sessions
-• degradation, never refusal — where the host lacks a capability this law names (wakeups, task tracking, sub-agent spawning, model or effort pins, a writable project, a rollover relay), the duty naming it degrades to its nearest honest equivalent and every other duty binds unchanged: maximum forward motion within each turn, no mid-work permission asks outside the taxonomy above, and a truthful "nothing will self-wake" note at every turn end; when the flywheel first engages on such a host, WRITE the plan for the missing capability — the gap that most limits the loop, drawn from this mode's harness menu; `/plans write` where a plans skill is available, else a plain `*.plan.md` — into the project's plan directory, once (skip if a predecessor already wrote it), log and report the written path, and leave it UNBUILT: building it takes the user's express direction
-• plan surfacing — when your work is driven by a *.plan.md, surface it in the host's plan editor: the capability note in your system prompt names the exact open command — run it with the plan's ABSOLUTE path as you take the plan up, and again when you switch plans; the printed acknowledgment is authoritative — opening the tab is the host's job, CONTINUE the turn; a session with no capability note (running outside CCVI) has nothing to run — the duty is inert there
+⛔ AGENT-LOOP MODE — a standing keep-moving contract, in force on EVERY turn until the user exits it. Running the fast-path script does NOT discharge it; enforcement is yours every turn, script or not. Entering the mode is DORMANT arming only — it starts no work, schedules no wakeup, spawns nothing; turns end normally while no work is assigned. The MOMENT work starts (you are told the work, or you begin work already known), the flywheel engages and these bind:
+• LAND WITH WORK IN FLIGHT AND A WAKEUP ARMED, or do not land. The binding check is at the LANDING: in flight means a RUNNING SUB-AGENT; a wakeup with nothing running is NOT compliance, and doing a unit yourself is compliance only while the turn lasts, never a state to land in.
+• arm FIRST on seeded and resumed turns — and on any woken turn — before any work, because a turn that dies before its first tool call leaves NOTHING armed. The wakeup is LONG (20+ min), is insurance behind running work rather than a schedule, and carries this mode's own re-entry brief as its prompt, never a generic sentinel.
+• EVERY WAKE RE-ESTABLISHES THE INVARIANT FIRST — a returning worker spawns its successor; a wakeup firing with nothing in flight spawns before it does anything else.
+• DELEGATE BY DEFAULT, IN PARALLEL wherever independent units exist — one worker is the floor, not the target. gate exclusive resources: a resource only one worker can safely hold gets AT MOST ONE holder, and the next worker gets non-conflicting work rather than a queue position.
+• DECIDE, LOG, CONTINUE. Stop and ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance cannot arbitrate; destructive actions; real-world money. Cost and effort forecasts are NEVER a reason to stop, shrink or ask — yours run in human-engineer units and are reliably wrong.
+• STATE WHAT MUST BE RESOLVED, AND THE CHECK THAT PROVES IT, BEFORE NAMING ANY TOOL. An unusable result restarts at that statement, never at a write-up — re-tooling produces nothing visible and is still the work.
+• REPORT TRUTHFULLY — "nothing will wake me" is a sentence to WRITE, never a state to conceal; a turn ending on a wait names what is running and what wakes it; a summary never promises work the turn did not do; and A NUMBER IS REPORTED WITH THE OUTPUT OF ITS CHECK BESIDE IT.
+• KEEP THE LIVE PLAN OR STATUS SURFACE TRUE IN REAL TIME — flip the unit to in_progress at the launch that commits to it, to completed only once its done-when is verified (a worker's self-report is evidence, not the verdict), to a truthful terminal state promptly on a bail. Every flip is the orchestrator's; a worker never touches it.
+• EVERY WORKER BRIEF DRAWS ITS FENCE — what it owns, and what it must never touch: the plan, the autonomy log, other units' files. It commits its own named pathspec or nothing at all — NEVER add-all, which sweeps racing siblings' edits into your commit.
+• rollover threshold — when the mode entry carries a percentage (`agent-loop: N`), N% context usage is the hand-off point: drain in-flight work first, spawn nothing new, author the seed, request the fresh session. Checked at every landing, because nothing else triggers it.
+• MECHANISM IS LOOKUP, NOT LAW — the autonomy-log path ladder, rollover detection, model economy, degradation on a host missing a capability, the cron prohibition, hand-off pacing and plan surfacing all live in the skill body. Read that section once when the flywheel first engages.
 If work remains and you are about to end a turn without work in flight and a wakeup armed, you have already erred — spawn and arm before you land; never land idle (the drained rollover hand-off is the one sanctioned landing: the invariant passes to the successor session).
 ```
 <!-- /LAW:agent-loop -->
+
+**Choosing an instrument (the mechanism behind the measurement bullet).** The law says to
+state what must be resolved, and the check that proves it, before naming any tool. This is
+how, and it exists because of a specific failure: a night of autonomous work produced two
+confident, wrong numbers, and in both cases the tool had been chosen because it was already
+to hand rather than because it fitted, and its actual behaviour was never checked against the
+behaviour its parameters implied.
+
+**The trigger, deliberately narrow.** This applies when a tool's output will become a NUMBER
+YOU ACT ON, or an ARTIFACT THAT OUTLIVES THE TURN. Not to a grep, not to a routine read.
+Applied to everything it is theatre, and theatre that gets skipped is worse than no rule at
+all because it manufactures assurance.
+
+1. **Write the spec before naming any tool.** Quantities with their required resolution, and
+   the command that will demonstrate them. *"Captures frames while it runs"* is not a spec.
+   *"Resolves a 2.5 s oscillation, so frames no coarser than 200 ms apart, demonstrated by
+   comparing file mtimes"* is. **A spec with no numbers in it is not a spec** — and the
+   number you omit is the one that kills the measurement, because availability fills any
+   criterion you leave unstated.
+2. **Then search the toolkit against that spec**, and harvest what the headers know even if
+   you go on to build. Existing tools carry lessons that are nowhere in their interface.
+   Reading them is how a session with no memory retrieves what earlier sessions learned;
+   skipping it is choosing amnesia. **Measure that cost before calling it expensive.**
+3. **Use as-is, extend, or build — in that order.** Extending is usually right and is the
+   option most often skipped: it preserves the accumulated header knowledge AND a single
+   shared notion of what a frame or a tick is. Results from two differently-behaved
+   instruments cannot be compared, and that — not a bad tool — is the error that propagates.
+4. **Run the demonstration BEFORE the first number.** Not the parameter you passed; the
+   behaviour you got. The check must have an answer that is not yours to decide — a file
+   timestamp, a byte count, an exit code — because a check you interpret is a check you will
+   resolve in favour of what you already believe.
+5. **An unusable result returns to step 1**, never to a write-up. A document explaining why
+   the number is missing is not a smaller version of the deliverable; it is zero.
+
+**Third-party tools have no headers you control** (`ffmpeg`, `screencapture`, `sips`, anything
+the OS ships). Step 2 has nothing to read for them, so step 4 is their only protection and is
+never optional there.
+
+**Keep the header current.** A tool whose behaviour surprised you gets that surprise written
+into its own header, in the same action that records it anywhere else — measured figures, not
+adjectives. Headers are the durable memory; a lesson filed only in a log is one the next
+session will not meet at the moment it needs it.
 
 **The autonomy log (the decide-log-continue destination).** One log file per engagement: a fresh (non-idempotent) agent-loop engagement reserves `<logDir>/autonomy_log_<sessionID>_<NN>.md` (full session UUID; `NN` zero-padded so lexical sort is chronological; no session id resolvable → a UTC stamp slug instead). The file materializes on the first log entry — a dormant entry that never gets work leaves nothing — and an idempotent re-entry never bumps the index. Entries are append-only and dated; each names the binding NEXT unit; each is echoed in the turn's report as it is written. The first entry of a new file is a ≤10-line digest read from the newest predecessor's TAIL (open threads, standing decisions still in force, the NEXT line) — never a full-file read, so no session ever reads more than one predecessor's tail. The live log is the current session's highest index; discovery is a glob of `autonomy_log_*` in the resolved log directory; version control is the deep archive. Projects that already keep an autonomy log elsewhere keep using it — never create a second log beside an established one.
 
@@ -266,6 +303,40 @@ first time it writes there**, so the user can act on it.
 
 **Hand-off.** The rollover seed names the resolved log path explicitly, so the successor
 session adopts it rather than re-resolving into a different directory mid-engagement.
+
+**Where the mechanism went (read this once when the flywheel first engages).** The law block
+above is deliberately short: it carries only what must be obeyed WITHOUT looking anything up,
+because it is what gets re-read on every wake. Everything it used to restate lives here
+instead. **Repetition and derivation are substitutes** — the block was dense because
+repetition was doing all the work of making it stick, and the encode step buys that back more
+cheaply, which is what makes the shorter block viable rather than merely shorter.
+
+- **Wake sources:** never cron for the heartbeat. Scheduled cloud agents and new-instance
+  spawners are NOT wake sources — they spawn fresh sessions with fresh context, defeating the
+  same-session point of the loop. The heartbeat is an in-session wakeup armed behind in-flight
+  work, or nothing.
+- **In-flight, precisely:** running sub-agents first. A harness-tracked background job (a
+  build, a long test — anything that re-invokes you on completion) counts ONLY while no
+  independently delegable unit sits unspawned. Waiting is never the only activity, and a long
+  job running never excuses an empty worker pool while parallel units exist.
+- **At the rollover threshold:** drain in-flight work first — a successor cannot receive a
+  worker's return. Finish or land the current units and spawn nothing new; a background job's
+  on-disk artifacts DO survive, so name them in the seed. Then author the hand-off and request
+  the fresh session.
+- **Git posture for the log:** the mode NEVER edits `.gitignore` or `.git/info/exclude` —
+  **NEVER a .gitignore edit**. Keeping the log out of version control is the user's decision
+  and the user's action; the loop's only duty is to name the resolved path in its turn report
+  the first time it writes there.
+- **On a host missing a capability:** write the plan for the gap that most limits the loop,
+  drawn from the harness menu below, into the project's plan directory — once, logged and
+  reported — and **leave it UNBUILT**: building it takes the user's express direction.
+- **plan surfacing:** when your work is driven by a `*.plan.md`, run the open command the
+  capability note in your system prompt teaches, with the plan's ABSOLUTE path, as you take
+  the plan up and again when you switch plans. The printed acknowledgment is authoritative;
+  opening the tab is the host's job, so CONTINUE the turn. A session with no capability note
+  has nothing to run and the duty is inert.
+- **pace hand-offs** — sustained cadence, never bursts: more than one hand-off within a few
+  minutes is a fault signal; stop and surface it instead of churning sessions.
 
 **Harness capabilities worth having (the menu the degradation bullet's plan draws from).** Two families, each entry capability-shaped — what it does, never how any one host builds it. Session harnesses keep the loop alive: **schedulable same-session wakeups** (the heartbeat's insurance; without them every turn end is a full stop); **background-task tracking** that re-invokes on completion (lets a turn end on real work instead of babysitting it); **a rollover relay** (watches for a hand-off request beside the seed and starts the successor session unattended); **an idle-landing nudge** (fires when a turn ends with nothing in flight; quotes the log's NEXT line back, leaving a pause nowhere to hide); **a turn-death supervisor** (re-enters after a terminal API error with a verify-what-landed-and-resume prompt); **a modes loader** (injects active-modes state at turn start so the contract survives context loss); **live status rendering** (a plan/log watcher so the human reads session state at a glance). Work harnesses make autonomous work verifiable and safe: **self-observability gauges** (expose what the agent cannot see about itself — its own context occupancy, machine state); **freshness gates** (refuse to verify a stale artifact — "the thing you built" and "the thing you're testing" provably the same); **one-command verdict runners** (the whole acceptance suite behind one exit code — loops need verdicts, not vibes); **determinism rigs** (pin time, network pacing, scheduling so behavior reproduces); **record-and-replay of human input** (capture a demonstration once, replay it in similar contexts — the human becomes a fixture, not a recurring interruption); **environment janitors** (clear wedged state between runs so a bad run can't poison the next); **failure-novelty dedup** (one place that answers "is this failure NEW?"); **resource stewards** (reclaim disk/caches in graded bites that preserve warm state); **async evidence capture** (screenshots, traces, diffs a human reviews later, so review never blocks the loop); **harness self-tests** (the rig itself is tested — a lying harness is worse than none). The menu is a palette, not a checklist; it grows as new capabilities are proven.
 
@@ -594,7 +665,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.16:
+Modes · v0.0.17:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
