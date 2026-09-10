@@ -25,13 +25,13 @@ Every `/modes` directive is handled by the bundled script `scripts/modes.py`. On
 
 2. The script's stdout is **two sections** split by the line `===MODES_USER_ECHO===`:
    - Everything **above** that line (under `===MODES_AGENT_NOTES===`) is **private guidance for you**: the behavioral contract for the modes now active. **Internalize it and enforce it for the rest of the session. NEVER display it to the user.** The notes end with a short **encode step** — a predict-then-derive ask (predict what `active_modes.md` now holds and verify it against the echo; name one thing you'll do differently many turns from now; state the single event that ends the mode). **Actually answer it in your private reasoning — write the sentences — before you emit the echo.** This is deliberate, not filler: the script owns the fast bookkeeping, but a mode you *derive* for yourself binds all session, where one you are merely *told* fades by the next unrelated turn. Spending those few tokens is the point; don't skip the ask. (The old all-markdown skill got this adherence for free because you had to reason the whole thing out by hand — the encode step buys it back cheaply now that the script does the reasoning-heavy bookkeeping.) **Keep the ask FALSIFIABLE.** The prediction about `active_modes.md` encodes because it can be *wrong* and the echo settles it; a reflective prompt with no checkable answer becomes recital, and recital does not encode. **`agent-loop` adds a fourth ask of its own**, for the same reason its law block is short: predict, in one sentence, what THIS turn's landing must contain — what will be running, what will be armed — then check it against what you actually land with. Repetition and derivation are substitutes, and the law was cut on the promise that derivation would replace it; this is that half of the trade.
-   - Everything **below** that line is the **user echo**. Print it to the user **verbatim, as plain markdown text — NOT inside a code block or fence** — as your **entire** reply. No preamble, no commentary, no reformatting.
+   - Everything **below** that line is the **user echo**. Print it to the user **verbatim, as plain markdown text — NOT inside a code block or fence** — as your **entire** reply. No preamble, no commentary, no reformatting. (If the same message also asked for other work, see **Bundled directives** under the Echo contract: the echo leads the reply, then you do the work.)
 
 3. **"Don't reason / just relay" scopes to the echo and the state bookkeeping ONLY — never to enforcement.** The agent-notes bind your behavior; the **Mode behaviors** section below is the authoritative reference for that behavior.
 
 **Fallback.** If that `Bash` call fails, use the **Fallback logic** section at the bottom:
 
-- **`python3` not installed** (shell "command not found" / exit 127): first output the single line `Installing python will speed up this skill.` on its own line, then run the fallback logic and print the normal echo. **This one nudge line is the sole exception to "the echo is the entire response."**
+- **`python3` not installed** (shell "command not found" / exit 127): first output the single line `Installing python will speed up this skill.` on its own line, then run the fallback logic and print the normal echo. **This one nudge line is the sole text allowed to precede the echo** — a bundled directive adds work *after* it (see **Bundled directives**), never anything before it.
 - **Any other failure** (non-zero exit, empty stdout, unresolved base dir): fall back **silently** — no nudge, just the normal echo produced by hand.
 
 A successful script run **ends your turn for the *directive*** — never mix the two paths. It does **not** end your obligation to the modes it just set: the script did the bookkeeping and handed you the law in its agent-notes, but enforcing that law on every later turn is yours and does not lapse. "Run script → relay → done" is the *directive* loop, not the *enforcement* loop. (A PreToolUse hook — see **Mechanical enforcement** below — is a deterministic backstop, but never lean on it: the contract is yours every turn.)
@@ -547,7 +547,7 @@ The leading verb is case-insensitive (`/Modes`, `/MODES` all work) but mode name
 
 ### Echo contract
 
-Every directive that mutates state — `/modes <mode-name>`, `/modes exit <mode>`, `/modes clear` — emits a structured echo so the user always sees the post-change state. `/modes list` emits the active-modes echo only. The echo is the **entire response** to a mode directive — no preamble, no commentary, no postscript — and is rendered as **plain markdown text, never inside a code block**.
+Every directive that mutates state — `/modes <mode-name>`, `/modes exit <mode>`, `/modes clear` — emits a structured echo so the user always sees the post-change state. `/modes list` emits the active-modes echo only. The echo is the **entire response** to a mode directive — no preamble, no commentary, no postscript — and is rendered as **plain markdown text, never inside a code block**. That phrasing assumes the message *is* the directive; when it carries other work too, see **Bundled directives** below.
 
 #### `/modes <mode-name> [param]` (enter)
 
@@ -636,6 +636,19 @@ active modes : none
 - `none` is rendered inline on the same line as `active modes :` — no bullet list when empty.
 - No preamble, no commentary, no postscript around the echo. The echo *is* the response, printed as plain markdown text (never fenced in a code block).
 
+#### Bundled directives (a directive plus other work)
+
+"The echo is the entire response" scopes to the **directive**, not to the **message**. It reads as an absolute because the overwhelmingly common case is a message that contains nothing but the directive — and in that case it *is* absolute.
+
+When one message bundles a directive with other requested work (`/modes agent — then apply those edits and run BBP`), the directive does not swallow the rest of the message and the rest of the message does not dilute the echo. Do both, in this order:
+
+1. **Lead with the echo, verbatim.** It is the first thing in your reply — nothing before it, no sentence introducing it, no commentary fused to it, never fenced, never abridged, never deferred to the end of the turn.
+2. **Then do the bundled work**, separated from the echo by a blank line, and report on it as you normally would.
+
+The mode the echo just announced governs the rest of that reply — a bundled `/modes one-word` means the work report is one word — but the echo itself is never subject to the mode it announces; it is always emitted in full.
+
+A bundled directive is **not** a stop signal: don't ask whether to proceed with the work the same message requested, and don't treat the echo as having ended your turn. What ends with the echo is the directive's own bookkeeping loop, nothing else.
+
 ### Mode blurbs
 
 The one-line blurb emitted with each enter echo (`/modes <mode-name>`):
@@ -687,7 +700,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.21:
+Modes · v0.0.22:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
@@ -704,6 +717,7 @@ Clear all:  /modes clear
 
 ### Edge cases
 
+- **A directive bundled with other work in one message** — echo first, verbatim, then do the work; see **Bundled directives**. Never withhold the echo, and never stop after it to ask.
 - **Re-entering an active mode** — emit the "already active" echo (which still includes the blurb and active-modes list). Don't error.
 - **Exiting an inactive mode** — emit the "not active" echo. Don't error.
 - **Empty pattern args** (`/modes exclude` with nothing after) — treat as no-op and ask the user for the intended patterns. Do not write to state.
