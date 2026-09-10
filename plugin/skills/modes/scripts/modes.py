@@ -85,16 +85,16 @@ PLAN_BLURB = ("new `*.plan.md` default to `{dir}` (default `./`), or elsewhere i
               "forbidden; non-markdown writes blocked. Produce a `*.plan.md`")
 BLURBS = {
     "agent": "full agency; the default working stance",
-    "agent-loop": "the autonomous flywheel — dormant until work starts, then at least "
-                  "one sub-agent always running + a wakeup always armed; only the "
-                  "blocker taxonomy stops forward motion",
+    "agent-loop": "the autonomous flywheel — dormant until work starts, then work in "
+                  "flight and a wakeup armed at every landing; only the blocker "
+                  "taxonomy stops forward motion",
     "one-word": "responses are a single word",
     "sbs": "step-by-step; one step then wait for 'done'",
     "exclude": "block writes matching listed patterns",
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.17:
+HELP_TEXT = """Modes · v0.0.18:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
@@ -423,6 +423,23 @@ ENCODE_PROMPT = (
     "contract you just derived."
 )
 
+# The agent-loop-specific ask, appended to ENCODE_PROMPT when that mode is active.
+# WHY IT EXISTS: the law block was cut by ~60% on the argument that repetition and
+# derivation are substitutes — the long block stuck because it was re-read on every wake,
+# and a shorter one has to buy that back by being DERIVED instead. Shipping the cut without
+# the derivation would leave the mode binding LESS than before, which is a regression, not a
+# tidy-up. This is the other half of that trade.
+# WHY THIS SHAPE: it is ONE question and it is FALSIFIABLE — a prediction about a specific
+# future moment (this turn's landing) that reality settles a few minutes later. The generic
+# asks above include two with no checkable answer, and a reflective prompt answered many
+# times becomes recital; recital does not encode.
+ENCODE_AGENT_LOOP = (
+    "  4. AGENT-LOOP — predict now, in one sentence, what THIS TURN'S LANDING must contain: "
+    "what will be running, and what will be armed. Check that prediction against what you "
+    "actually land with. If they differ you have not complied — fix it before you land, and "
+    "do not describe the difference away."
+)
+
 
 def render_agent_notes(state):
     """The private agent-notes block (above the echo delimiter) for the post-change modes.
@@ -435,7 +452,13 @@ def render_agent_notes(state):
     if not state:
         return "No modes active — full default agency."
     parts = [mode_note(n, state[n]) for n in sorted(state.keys())]
-    parts.append(ENCODE_PROMPT)
+    ask = ENCODE_PROMPT
+    if "agent-loop" in state:
+        # Insert the mode-specific falsifiable ask BEFORE the closing exhortation, so it
+        # reads as item 4 of the list rather than as an afterthought below the sign-off.
+        marker = "If you jumped straight to the echo"
+        ask = ask.replace(marker, ENCODE_AGENT_LOOP + "\n" + marker, 1)
+    parts.append(ask)
     return "\n".join(parts)
 
 

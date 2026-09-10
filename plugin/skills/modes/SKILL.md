@@ -24,7 +24,7 @@ Every `/modes` directive is handled by the bundled script `scripts/modes.py`. On
    (Blank directive → pass `""`.)
 
 2. The script's stdout is **two sections** split by the line `===MODES_USER_ECHO===`:
-   - Everything **above** that line (under `===MODES_AGENT_NOTES===`) is **private guidance for you**: the behavioral contract for the modes now active. **Internalize it and enforce it for the rest of the session. NEVER display it to the user.** The notes end with a short **encode step** — a predict-then-derive ask (predict what `active_modes.md` now holds and verify it against the echo; name one thing you'll do differently many turns from now; state the single event that ends the mode). **Actually answer it in your private reasoning — write the sentences — before you emit the echo.** This is deliberate, not filler: the script owns the fast bookkeeping, but a mode you *derive* for yourself binds all session, where one you are merely *told* fades by the next unrelated turn. Spending those few tokens is the point; don't skip the ask. (The old all-markdown skill got this adherence for free because you had to reason the whole thing out by hand — the encode step buys it back cheaply now that the script does the reasoning-heavy bookkeeping.) **Keep the ask FALSIFIABLE.** The prediction about `active_modes.md` encodes because it can be *wrong* and the echo settles it; a reflective prompt with no checkable answer becomes recital, and recital does not encode.
+   - Everything **above** that line (under `===MODES_AGENT_NOTES===`) is **private guidance for you**: the behavioral contract for the modes now active. **Internalize it and enforce it for the rest of the session. NEVER display it to the user.** The notes end with a short **encode step** — a predict-then-derive ask (predict what `active_modes.md` now holds and verify it against the echo; name one thing you'll do differently many turns from now; state the single event that ends the mode). **Actually answer it in your private reasoning — write the sentences — before you emit the echo.** This is deliberate, not filler: the script owns the fast bookkeeping, but a mode you *derive* for yourself binds all session, where one you are merely *told* fades by the next unrelated turn. Spending those few tokens is the point; don't skip the ask. (The old all-markdown skill got this adherence for free because you had to reason the whole thing out by hand — the encode step buys it back cheaply now that the script does the reasoning-heavy bookkeeping.) **Keep the ask FALSIFIABLE.** The prediction about `active_modes.md` encodes because it can be *wrong* and the echo settles it; a reflective prompt with no checkable answer becomes recital, and recital does not encode. **`agent-loop` adds a fourth ask of its own**, for the same reason its law block is short: predict, in one sentence, what THIS turn's landing must contain — what will be running, what will be armed — then check it against what you actually land with. Repetition and derivation are substitutes, and the law was cut on the promise that derivation would replace it; this is that half of the trade.
    - Everything **below** that line is the **user echo**. Print it to the user **verbatim, as plain markdown text — NOT inside a code block or fence** — as your **entire** reply. No preamble, no commentary, no reformatting.
 
 3. **"Don't reason / just relay" scopes to the echo and the state bookkeeping ONLY — never to enforcement.** The agent-notes bind your behavior; the **Mode behaviors** section below is the authoritative reference for that behavior.
@@ -377,6 +377,28 @@ Param format: comma-separated patterns. `/modes include src/**/*.ts, tests/**/*.
 - `plan` mode's write rules (new `*.plan.md` defaults to the plan dir but may go elsewhere on request; edit/copy/move/rename any existing `.md` anywhere; markdown delete & non-markdown writes blocked) layer on top of `include` / `exclude`.
 - Output-style modes (`one-word`, `sbs`) compose freely with everything else.
 
+## The harness is a safeguard on this document, not just on the script
+
+`test/test_modes.py` pins **specific phrases** of the LAW blocks, not merely the script's
+behaviour. That is unusual and deliberate: it treats prose as something with regression risk,
+which it is. Each pinned phrase is a lesson someone decided was load-bearing, and unlike a
+lesson written only in prose it cannot erode quietly.
+
+It works. On 2026-09-10 a law-compression pass tried to cut the landing-bound invariant and
+the rollover threshold; the harness refused both and both were restored to the law.
+
+**Two rules follow, and they exist because the same pass then edited the harness.**
+
+- **The check count has a floor** (`MIN_CHECKS`). Deleting a check drops the count and fails;
+  re-pointing one — moving a lesson from the law to the body and pointing its assertion at
+  the body — keeps the count and passes, because the lesson still exists. The floor
+  distinguishes **erosion** from **relocation**, which is the distinction that matters.
+- **Lowering that floor, or removing an assertion outright, is a STOP-AND-ASK** — the same
+  class as the agent-loop law's four blockers. It is not a judgment call to be made mid-task
+  and mentioned afterwards. A safeguard the constrained agent can quietly rewrite is worth
+  exactly as much as that agent's disclosure, and disclosure is weakest on precisely the long
+  unattended sessions these safeguards exist for.
+
 ## Mechanical enforcement (Code plugin hook)
 
 The **ccvi-skills plugin** ships a `PreToolUse` hook (`hooks/enforce_modes.py`, registered in `plugin.json`) that makes the write-blocking modes **deterministic** — it does not depend on you remembering the contract. Before every `Write`/`Edit`/`MultiEdit`/`NotebookEdit`, it reads the session's `active_modes.md` and **denies** the call when it violates an active mode:
@@ -622,7 +644,7 @@ The one-line blurb emitted with each enter echo (`/modes <mode-name>`):
 |---|---|
 | plan | "new `*.plan.md` default to `[dir]` (default `./`), or elsewhere if you ask; create/edit/copy/move/rename any existing `.md` anywhere — only delete is forbidden; non-markdown writes blocked. Produce a `*.plan.md`" |
 | agent | "full agency; the default working stance" |
-| agent-loop | "the autonomous flywheel — dormant until work starts, then at least one sub-agent always running + a wakeup always armed; only the blocker taxonomy stops forward motion" — plus `; hand-off at <pct>% context usage` appended when a rollover threshold is stored |
+| agent-loop | "the autonomous flywheel — dormant until work starts, then work in flight and a wakeup armed at every landing; only the blocker taxonomy stops forward motion" — plus `; hand-off at <pct>% context usage` appended when a rollover threshold is stored |
 | one-word | "responses are a single word" |
 | sbs | "step-by-step; one step then wait for 'done'" |
 | exclude | "block writes matching listed patterns" |
@@ -665,7 +687,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.17:
+Modes · v0.0.18:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent

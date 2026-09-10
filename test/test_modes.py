@@ -320,6 +320,14 @@ def main():
               "old project-root log destination still present")
     check("aloop/notes-dormant", "DORMANT" in n, "dormant-entry clause missing from notes")
     check("aloop/encode", "Predict what active_modes.md" in n and "DERIVE" in n, "encode prompt missing")
+    # The agent-loop-specific ask. The law block was cut ~60% on the argument that repetition
+    # and derivation are substitutes; this is the derivation half. Shipping the cut without it
+    # would leave the mode binding LESS than before. It is ONE question and FALSIFIABLE — a
+    # prediction about this turn's landing, which reality settles minutes later.
+    check("aloop/encode-landing-ask", "predict now, in one sentence, what THIS TURN'S LANDING" in n,
+          "agent-loop's falsifiable landing ask missing from the notes")
+    check("aloop/encode-ask-ordering", n.index("AGENT-LOOP — predict now") < n.index("If you jumped straight"),
+          "the landing ask must read as item 4, before the closing exhortation")
     # mutex displacement both ways
     out, _, final = run("plan ./doc", seed="# Active modes\n\n- agent-loop\n")
     check("aloop/plan-displaces", "mode agent-loop is now inactive." in echo_of(out), repr(echo_of(out)))
@@ -400,6 +408,31 @@ def main():
           in echo_of(out), repr(echo_of(out)))
     # a parameterized entry stays inert to the write hook
     check("pct/hook-noop", run_hook("Write", "/proj/foo.py", "# Active modes\n\n- agent-loop: 20\n") is None)
+
+    # 22. THE ANTI-EROSION GUARD. Each pinned phrase in this file is a lesson someone decided
+    # was load-bearing; prose lessons decay silently, a pinned one cannot. On 2026-09-10 this
+    # harness refused two cuts during a law compression and was right both times.
+    # The guard distinguishes EROSION from RELOCATION on purpose: deleting a check drops the
+    # count and fails here, while re-pointing one (law -> body) keeps the count and passes,
+    # because the lesson still exists. Raise MIN_CHECKS when you add checks; LOWERING it is
+    # the move this guard exists to make visible, and it is a stop-and-ask, not a judgment
+    # call.
+    # the floor is asserted in the Report block below, outside check(), so the guard never
+    # has to reason about whether it counts itself.
+    # the agent-loop ask is scoped: other modes must not inherit it
+    out, _, _ = run("plan ./doc", seed=AGENT_ONLY)
+    check("harness/ask-scoped", "THIS TURN'S LANDING" not in notes_of(out),
+          "the agent-loop landing ask leaked into a non-agent-loop mode")
+
+    # THE ANTI-EROSION FLOOR (see the guard comment above). Deleting a check drops the count
+    # and fails here; re-pointing one (law -> body) keeps it and passes, because the lesson
+    # still exists. Raise it when you add checks. LOWERING it is the act this floor exists to
+    # make visible — treat that as a stop-and-ask, not a judgment call.
+    MIN_CHECKS = 124
+    if _count < MIN_CHECKS:
+        _failures.append(
+            "harness/no-erosion  check count {} is below the floor {} — a tripwire was "
+            "REMOVED rather than relocated".format(_count, MIN_CHECKS))
 
     # Report
     if _failures:
