@@ -94,7 +94,7 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.22:
+HELP_TEXT = """Modes · v0.0.23:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
@@ -121,14 +121,22 @@ Clear all:  /modes clear
 # --------------------------------------------------------------------------------------
 
 
+def project_slug(cwd):
+    # Claude Code's project dir name: separators and the drive colon become '-', so
+    # C:\Users\x\proj -> C--Users-x-proj and /Users/x/proj -> -Users-x-proj. A Windows cwd
+    # must yield a RELATIVE slug, or os.path.join discards the home prefix. POSIX paths
+    # contain neither '\\' nor ':', so their slug is unchanged. Mirrors enforce_modes.py.
+    return cwd.replace("\\", "-").replace(":", "-").replace("/", "-")
+
+
 def resolve_memory_root():
     """
     Return (session_dir, sid) where session_dir is `<auto-memory>/<session_id>/`, or
     (None, None) if there is no resolvable session id — in which case
     we run in-context only and never touch the filesystem.
 
-    Auto-memory root is `$HOME/.claude/projects/<slug>/memory`, where <slug> is the
-    project directory with '/' replaced by '-'. For robustness on reads, if the
+    Auto-memory root is `$HOME/.claude/projects/<slug>/memory`, where <slug> is
+    project_slug(cwd): the project directory with '/', '\\' and ':' replaced by '-'. For robustness on reads, if the
     cwd-derived path has no session dir yet, we glob every project for the session id.
     """
     sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
@@ -139,7 +147,7 @@ def resolve_memory_root():
 
     # Primary: derive the project slug from the current working directory.
     cwd = os.getcwd()
-    slug = cwd.replace("/", "-")
+    slug = project_slug(cwd)
     primary = os.path.join(home, ".claude", "projects", slug, "memory")
     session_dir = os.path.join(primary, sid)
 
@@ -647,21 +655,38 @@ def main(argv):
     # 3. compute the resulting state + the two output sections for this directive.
     new_state, echo, should_write, notes = apply_directive(state, raw)
 
-    # 4. Persist state for state-mutating verbs when a session dir is resolvable. Read-only
-    # verbs (list, help) never write; no-session surfaces run in-context only.
-    if should_write and session_dir is not None:
-        write_state(session_dir, new_state)
-
-    # 5. Emit the dual-section stdout: AGENT_DELIM, [agent-notes], ECHO_DELIM, echo. The
+    # 4. Assemble the dual-section stdout: AGENT_DELIM, [agent-notes], ECHO_DELIM, echo. The
     # notes line is omitted for the cheat-sheet (notes == ""), leaving an empty agent
     # section; the trailing newline keeps the echo a clean final line for the caller.
+    # Built BEFORE the state write so nothing after the write can fail on formatting.
     out = [AGENT_DELIM]
     if notes:
         out.append(notes)
     out.append(ECHO_DELIM)
     out.append(echo)
-    sys.stdout.write("\n".join(out) + "\n")
+    text = "\n".join(out) + "\n"
+
+    # 5. Persist state for state-mutating verbs when a session dir is resolvable. Read-only
+    # verbs (list, help) never write; no-session surfaces run in-context only.
+    if should_write and session_dir is not None:
+        write_state(session_dir, new_state)
+
+    # 6. Emit.
+    emit(text)
     return 0
+
+
+def emit(text):
+    # Explicit UTF-8: Windows Python writes piped stdout as cp1252, which cannot encode the
+    # LAW blocks' ⛔. Bytes bypass the platform default; on macOS/Linux they are what
+    # sys.stdout already produced.
+    data = text.encode("utf-8")
+    buf = getattr(sys.stdout, "buffer", None)
+    if buf is not None:
+        buf.write(data)
+        buf.flush()
+    else:
+        sys.stdout.write(text)
 
 
 if __name__ == "__main__":

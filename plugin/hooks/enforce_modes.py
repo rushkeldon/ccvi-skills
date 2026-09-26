@@ -37,12 +37,20 @@ import glob
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 
+def project_slug(cwd):
+    # Claude Code's project dir name: separators and the drive colon become '-', so
+    # C:\Users\x\proj -> C--Users-x-proj and /Users/x/proj -> -Users-x-proj. A Windows cwd
+    # must yield a RELATIVE slug, or os.path.join discards the home prefix. POSIX paths
+    # contain neither '\\' nor ':', so their slug is unchanged. Mirrors scripts/modes.py.
+    return cwd.replace("\\", "-").replace(":", "-").replace("/", "-")
+
+
 def resolve_active_modes_path(cwd, sid):
     """Locate <auto-memory>/<sid>/active_modes.md. Mirrors scripts/modes.py resolution."""
     if not sid:
         return None
     home = os.path.expanduser("~")
-    slug = (cwd or os.getcwd()).replace("/", "-")
+    slug = project_slug(cwd or os.getcwd())
     primary = os.path.join(
         home, ".claude", "projects", slug, "memory", sid, "active_modes.md")
     if os.path.isfile(primary):
@@ -121,6 +129,11 @@ def candidate_paths(path, cwd):
                 cands.append(rel)
         except ValueError:  # different drive on Windows, etc.
             pass
+    # Globs are written with '/', but Windows paths (and relpath there) use '\'. Normalise so
+    # glob_to_regex matches on every OS; a no-op on POSIX.
+    for sep in (os.sep, os.altsep):
+        if sep and sep != "/":
+            cands = [c.replace(sep, "/") for c in cands]
     return cands
 
 

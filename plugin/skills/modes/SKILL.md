@@ -31,7 +31,7 @@ Every `/modes` directive is handled by the bundled script `scripts/modes.py`. On
 
 **Fallback.** If that `Bash` call fails, use the **Fallback logic** section at the bottom:
 
-- **`python3` not installed** (shell "command not found" / exit 127): first output the single line `Installing python will speed up this skill.` on its own line, then run the fallback logic and print the normal echo. **This one nudge line is the sole text allowed to precede the echo** — a bundled directive adds work *after* it (see **Bundled directives**), never anything before it.
+- **`python3` not installed** (shell "command not found" / exit 127, or on Windows the Store alias stub: `Python was not found` / exit 49, 9009 from cmd): first output the single line `Installing python will speed up this skill.` on its own line, then run the fallback logic and print the normal echo. **This one nudge line is the sole text allowed to precede the echo** — a bundled directive adds work *after* it (see **Bundled directives**), never anything before it.
 - **Any other failure** (non-zero exit, empty stdout, unresolved base dir): fall back **silently** — no nudge, just the normal echo produced by hand.
 
 A successful script run **ends your turn for the *directive*** — never mix the two paths. It does **not** end your obligation to the modes it just set: the script did the bookkeeping and handed you the law in its agent-notes, but enforcing that law on every later turn is yours and does not lapse. "Run script → relay → done" is the *directive* loop, not the *enforcement* loop. (A PreToolUse hook — see **Mechanical enforcement** below — is a deterministic backstop, but never lean on it: the contract is yours every turn.)
@@ -700,7 +700,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.22:
+Modes · v0.0.23:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent

@@ -224,7 +224,8 @@ def _read(path):
 
 
 def _write(path, text):
-  with open(path, "w", encoding="utf-8") as fh:
+  # newline="\n": text mode on Windows would write CRLF, and the zip packs raw bytes.
+  with open(path, "w", encoding="utf-8", newline="\n") as fh:
     fh.write(text)
 
 
@@ -296,6 +297,8 @@ def zip_bytes(version):
       # Executable bit for scripts, plain for everything else.
       perm = 0o755 if arcname.endswith((".py", ".sh")) else 0o644
       info.external_attr = perm << 16
+      # Unix host: a Windows build otherwise writes MS-DOS entries and unzip drops exec bits.
+      info.create_system = 3
       if blob is None:
         with open(src, "rb") as fh:
           blob = fh.read()

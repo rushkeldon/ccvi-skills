@@ -38,7 +38,9 @@ _count = 0
 
 
 def slug_for(path):
-    return path.replace("/", "-")
+    # Same rule as modes.py / enforce_modes.py project_slug(): a Windows cwd must yield a
+    # relative slug (C:\x -> C--x); POSIX paths are unchanged.
+    return path.replace("\\", "-").replace(":", "-").replace("/", "-")
 
 
 def run(directive, seed=None, with_session=True):
@@ -50,26 +52,53 @@ def run(directive, seed=None, with_session=True):
     try:
         env = dict(os.environ)
         env["HOME"] = home
+        env["USERPROFILE"] = home  # Windows expanduser("~") reads USERPROFILE, not HOME
         memdir = os.path.join(home, ".claude", "projects", slug_for(REPO), "memory", SID)
         if with_session:
             env["CLAUDE_CODE_SESSION_ID"] = SID
             os.makedirs(memdir, exist_ok=True)
             if seed is not None:
-                with open(os.path.join(memdir, "active_modes.md"), "w") as fh:
+                with open(os.path.join(memdir, "active_modes.md"), "w", encoding="utf-8") as fh:
                     fh.write(seed)
         else:
             env.pop("CLAUDE_CODE_SESSION_ID", None)
         proc = subprocess.run(
             [sys.executable, SCRIPT, directive],
-            cwd=REPO, env=env, capture_output=True, text=True)
+            cwd=REPO, env=env, capture_output=True, encoding="utf-8")
         final = None
         fpath = os.path.join(memdir, "active_modes.md")
         if os.path.isfile(fpath):
-            with open(fpath) as fh:
+            with open(fpath, encoding="utf-8") as fh:
                 final = fh.read()
         return proc.stdout, proc.returncode, final
     finally:
         shutil.rmtree(home, ignore_errors=True)
+
+
+def run_bytes(directive, extra_env):
+    """Run the script with a fresh temp HOME and a session, returning (stdout BYTES, rc).
+    No text decoding here, so the caller sees exactly what the script emitted."""
+    home = tempfile.mkdtemp()
+    try:
+        env = dict(os.environ)
+        env["HOME"] = home
+        env["USERPROFILE"] = home
+        env["CLAUDE_CODE_SESSION_ID"] = SID
+        env.update(extra_env)
+        proc = subprocess.run([sys.executable, SCRIPT, directive],
+                              cwd=REPO, env=env, capture_output=True)
+        return proc.stdout, proc.returncode
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def load_hook_module():
+    """Import hooks/enforce_modes.py by path (it is not on a package path)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("enforce_modes", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def echo_of(stdout):
@@ -105,10 +134,11 @@ def run_hook(tool_name, file_path, seed):
     try:
         env = dict(os.environ)
         env["HOME"] = home
+        env["USERPROFILE"] = home  # Windows expanduser("~") reads USERPROFILE, not HOME
         memdir = os.path.join(home, ".claude", "projects", slug_for(REPO), "memory", SID)
         os.makedirs(memdir, exist_ok=True)
         if seed is not None:
-            with open(os.path.join(memdir, "active_modes.md"), "w") as fh:
+            with open(os.path.join(memdir, "active_modes.md"), "w", encoding="utf-8") as fh:
                 fh.write(seed)
         payload = json.dumps({
             "tool_name": tool_name,
@@ -117,7 +147,7 @@ def run_hook(tool_name, file_path, seed):
             "cwd": REPO,
         })
         proc = subprocess.run([sys.executable, HOOK], input=payload,
-                              cwd=REPO, env=env, capture_output=True, text=True)
+                              cwd=REPO, env=env, capture_output=True, encoding="utf-8")
         out = proc.stdout.strip()
         return json.loads(out) if out else None
     finally:
@@ -187,7 +217,7 @@ def main():
     check("clear/notes", notes_of(out) == "No modes active — full default agency.", repr(notes_of(out)))
 
     # 8. blank verb -> verbatim help (now ending with the stamped version line), empty notes
-    version = json.load(open(os.path.join(REPO, "plugin", ".claude-plugin", "plugin.json")))["version"]
+    version = json.load(open(os.path.join(REPO, "plugin", ".claude-plugin", "plugin.json"), encoding="utf-8"))["version"]
     out, _, final = run("", seed=AGENT_ONLY)
     check("help/version-header", echo_of(out).startswith("Modes · v" + version + ":\n• plan [dir]"), repr(echo_of(out)[:50]))
     check("help/clear-line", "Clear all:  /modes clear" in echo_of(out))
@@ -260,6 +290,13 @@ def main():
     check("hook/include-blocks-nonmatch", denied(run_hook("Write", os.path.join(REPO, "other.py"), INC)))
     check("hook/include-allows-nested", run_hook("Write", os.path.join(REPO, "src/deep/a.ts"), INC) is None)
     check("hook/include-allows-shallow", run_hook("Write", os.path.join(REPO, "src/a.ts"), INC) is None)
+    # native separators throughout (all '\' on Windows): globs are '/'-written, so the hook
+    # must normalise the path before matching, or include denies and exclude never blocks.
+    check("hook/include-allows-native-sep",
+          run_hook("Write", os.path.join(REPO, "src", "deep", "a.ts"), INC) is None)
+    check("hook/exclude-blocks-native-sep",
+          denied(run_hook("Edit", os.path.join(REPO, "build", "out", "a.js"),
+                          "# Active modes\n\n- exclude: build/**\n")))
 
     # 20. agent-loop — clear-on-entry, three-way mutex, layering, idempotent re-entry,
     # the two-word guard, the LAW byte-lock, and hook inertness.
@@ -424,11 +461,35 @@ def main():
     check("harness/ask-scoped", "THIS TURN'S LANDING" not in notes_of(out),
           "the agent-loop landing ask leaked into a non-agent-loop mode")
 
+    # 23. Windows output + slug. A Windows pipe is cp1252, which cannot encode the LAW's ⛔;
+    # forcing PYTHONIOENCODING=cp1252 simulates it on ANY OS, so a regression of the
+    # explicit-UTF-8 emit fails here on a Mac too, not only on the machine that exposed it.
+    raw, rc = run_bytes("plan doc", {"PYTHONIOENCODING": "cp1252"})
+    check("win/cp1252-stdout-rc", rc == 0, "exit {} under a cp1252 stdout".format(rc))
+    try:
+        decoded = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        decoded = None
+        check("win/cp1252-stdout-utf8", False, repr(exc))
+    else:
+        check("win/cp1252-stdout-utf8", True)
+    check("win/cp1252-stdout-law", decoded is not None and "⛔ PLAN MODE" in decoded,
+          "the ⛔ LAW line is missing from the cp1252-forced stdout")
+    # the slug must be RELATIVE for a Windows cwd (else os.path.join drops the home prefix)
+    # and unchanged for POSIX; the script and the hook are separate programs, so both copies
+    # of the rule are pinned.
+    hook_mod = load_hook_module()
+    for label, slug_fn in (("script", modes_mod.project_slug), ("hook", hook_mod.project_slug)):
+        check("win/slug-windows[{}]".format(label),
+              slug_fn("C:\\Users\\x\\proj") == "C--Users-x-proj", slug_fn("C:\\Users\\x\\proj"))
+        check("win/slug-posix[{}]".format(label),
+              slug_fn("/Users/x/proj") == "-Users-x-proj", slug_fn("/Users/x/proj"))
+
     # THE ANTI-EROSION FLOOR (see the guard comment above). Deleting a check drops the count
     # and fails here; re-pointing one (law -> body) keeps it and passes, because the lesson
     # still exists. Raise it when you add checks. LOWERING it is the act this floor exists to
     # make visible — treat that as a stop-and-ask, not a judgment call.
-    MIN_CHECKS = 124
+    MIN_CHECKS = 133
     if _count < MIN_CHECKS:
         _failures.append(
             "harness/no-erosion  check count {} is below the floor {} — a tripwire was "

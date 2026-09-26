@@ -1,0 +1,7 @@
+* text=auto eol=lf
+# eol=lf: check text out as LF on every OS (a no-op on Mac/Linux). On Windows,
+# core.autocrlf would otherwise write CRLF sources, and build.py zips raw bytes -
+# a Windows build would ship CRLF files and never match the committed zip.
+
+# Binaries - never touch
+*.zip     binary
