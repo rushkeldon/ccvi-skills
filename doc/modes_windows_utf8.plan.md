@@ -25,11 +25,11 @@ todos:
     phase: "2 - guard"
   - id: bbpi
     content: "BBPI per CLAUDE.md: bump plugin/.claude-plugin/plugin.json to the next patch, python3 build.py, then build.py --check and test/test_modes.py both exit 0, push, unzip into ~/.ccvi/ccvi-skills/plugin/, and confirm the installed plugin.json version"
-    status: in_progress
+    status: completed
     phase: "3 - ship"
   - id: verify-live-windows
     content: "In the NEXT Claude Code session on the Windows machine (after IDEA restarts so python3 is on PATH): run /modes plan doc, then /modes agent. Both print the echo from the script (exit 0, no fallback) and active_modes.md is correct. In plan mode, a Write to a .ts file is denied by the hook"
-    status: pending
+    status: in_progress
     phase: "4 - verify"
 isProject: false
 ---
@@ -206,9 +206,11 @@ Per `CLAUDE.md` "BBP / BBPI":
   - **Hook separators:** `candidate_paths()` normalises `os.sep`/`os.altsep` to `/`; a no-op on POSIX.
   - **Zip host:** `build.py` sets `info.create_system = 3`. Built from HEAD's LF sources, it reproduces HEAD's zip byte for byte.
   - **LF:** added `.gitattributes` `* text=auto eol=lf` (as in ccvi-idea 5e02a33) plus `git add --renormalize .`. No git config change.
+  - **Stamp writes (builder, under the byte-identity requirement):** `build.py` `_write()` now uses `newline="\n"`. Text mode on Windows had turned stamped files, and so 6 zip members, into CRLF.
+- **DONE:** v0.0.23, commit 8178395, pushed. `--check` OK, 133/133. The installed plugin.json reads 0.0.23.
 
 ### verify-live-windows
-- **Awaits:** `bbpi` first, then a fresh Claude Code session on Windows. A plan-builder agent cannot run this todo.
+- **Awaits a fresh Claude Code session on Windows** (`bbpi` has shipped 0.0.23). A plan-builder agent cannot run this todo.
 In a NEW session on the Windows machine:
 - **Directives:** `/modes plan doc` and then `/modes agent` each end with the script's echo. There
   is no `Installing python…` line and no fallback. `active_modes.md` holds `- plan: doc`, then
