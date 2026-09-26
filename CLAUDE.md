@@ -40,6 +40,13 @@ ccvi-skills/
   enforcement hook, the `<ccvi-modes>` sentinel, the Plan Editor, the seedprompt
   sidecar consumer. Runtime-resilience branches (a missing python3, a denied tool,
   a sentinel absent this turn, the sidecar not firing) stay; surface hedges do not.
+- The skills **may assume `python3`** (3.9 or newer) on every platform. The CCVI host
+  guarantees it: when `python3` is missing, ccvi-idea's "Python is required" card detects it
+  and offers a one-click install. See ccvi-idea's
+  `doc/ref/python_provisioning_spike.md` and its CLAUDE.md "Python is required". The
+  missing-python3 branch above stays as a **fallback for resilience, not a supported
+  configuration**. Do not grow new features around it, and do not port the scripts to Node
+  to avoid Python.
 - **No surface variants, ever.** This suite targets Claude Code inside the CCVI
   family only. Do not reintroduce Chat/Cowork/Desktop branches, variant dirs, or
   propagation machinery.
