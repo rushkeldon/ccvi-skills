@@ -38,11 +38,63 @@ WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 
 def project_slug(cwd):
-    # Claude Code's project dir name: separators and the drive colon become '-', so
+    # Claude Code's project dir name: EVERY non-alphanumeric character becomes '-', so
     # C:\Users\x\proj -> C--Users-x-proj and /Users/x/proj -> -Users-x-proj. A Windows cwd
-    # must yield a RELATIVE slug, or os.path.join discards the home prefix. POSIX paths
-    # contain neither '\\' nor ':', so their slug is unchanged. Mirrors scripts/modes.py.
-    return cwd.replace("\\", "-").replace(":", "-").replace("/", "-")
+    # still yields a RELATIVE slug (the drive colon becomes '-'), which matters because an
+    # absolute-looking slug makes os.path.join discard the home prefix.
+    #
+    # This replaces an older rule that mapped only '\\', ':' and '/'. Those agree with
+    # Claude Code on paths made of alphanumerics and separators, and DISAGREE on anything
+    # containing '.', '_' or a space: /Users/k/my_app resolved to -Users-k-my_app here while
+    # the host and Claude Code both use -Users-k-my-app, so the Python and TypeScript sides
+    # keyed two different directories for the same project. Mirrors scripts/modes.py.
+    return re.sub(r"[^a-zA-Z0-9]", "-", cwd)
+
+
+def memory_key_dir(cwd):
+    """
+    The directory Claude Code keys AUTO-MEMORY by: the repository's main checkout, with
+    symlinks resolved. Transcripts are keyed per folder; auto-memory is not.
+
+    Probed 2026-10-19 — a worktree added through a symlink to its main checkout put the
+    session's memory dir under the main checkout's REALPATH while its transcript stayed
+    under the worktree; a session in a symlinked plain clone put both under the target.
+    So: realpath, then follow .git -> gitdir: -> commondir when .git is a FILE (a worktree).
+
+    Pure stdlib, no git subprocess. Mirrors memoryKeyDir() in the host's
+    sidecar/src/paths.ts; the two must agree or a seed written by this skill lands where
+    the sidecar never reads. Every failure path returns the cwd unchanged.
+    """
+    try:
+        key = os.path.realpath(cwd)
+    except OSError:
+        key = cwd
+    try:
+        dot_git = os.path.join(key, ".git")
+        # A worktree's .git is a FILE; a normal clone's is a directory.
+        if not os.path.isfile(dot_git):
+            return key
+        with open(dot_git, "r", encoding="utf-8") as fh:
+            line = fh.read().strip()
+        if not line.startswith("gitdir:"):
+            return key
+        git_dir = os.path.abspath(
+            os.path.join(key, line[len("gitdir:"):].strip()))
+        commondir_file = os.path.join(git_dir, "commondir")
+        if os.path.isfile(commondir_file):
+            with open(commondir_file, "r", encoding="utf-8") as fh:
+                common_dir = os.path.abspath(
+                    os.path.join(git_dir, fh.read().strip()))
+        else:
+            common_dir = git_dir
+        # basename must be '.git'. A submodule's commondir lands under .git/modules/<name>,
+        # so this guard makes submodules and any unexpected layout fall back rather than
+        # inventing a root.
+        if os.path.basename(common_dir) == ".git":
+            return os.path.dirname(common_dir)
+    except (OSError, ValueError, UnicodeDecodeError):
+        pass
+    return key
 
 
 def resolve_active_modes_path(cwd, sid):
@@ -50,7 +102,10 @@ def resolve_active_modes_path(cwd, sid):
     if not sid:
         return None
     home = os.path.expanduser("~")
-    slug = project_slug(cwd or os.getcwd())
+    # Keyed by the REPOSITORY (the main checkout when this is a git worktree), matching
+    # Claude Code and the host's projectMemoryRoot. The glob below still covers a session
+    # whose file predates this change and so sits under the old per-folder slug.
+    slug = project_slug(memory_key_dir(cwd or os.getcwd()))
     primary = os.path.join(
         home, ".claude", "projects", slug, "memory", sid, "active_modes.md")
     if os.path.isfile(primary):

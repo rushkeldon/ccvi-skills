@@ -42,28 +42,58 @@ next session" → `write`; "read/consume/load the seed" → `read`; "show/what's
 
 ## Path resolution (the reliability crux)
 
-The seed is **always** written to **`<memoryRoot>/seedprompt.md`** — a **project-level** file:
+The seed is **always** written to **`<memoryRoot>/<seedFile>`** — a **project-level** file:
 
 - `<memoryRoot>` is the **auto-memory directory named in the system prompt** (the parent of the
   per-session `<session_id>/` dirs — the *same* anchor the `modes` skill uses for `active_modes.md`).
   Resolve it once from context; do not guess.
+- `<seedFile>` is normally **`seedprompt.md`**, but is **folder-scoped** in the one case below.
 - The seed sits **beside `MEMORY.md`**, directly in `<memoryRoot>/`.
+
+**`<seedFile>` — scope it when `<memoryRoot>` is not this folder's own.** Claude Code keys the
+auto-memory directory by the **repository**, not the working directory: in a `git worktree`,
+every window of that repository is handed the **main checkout's** `<memoryRoot>`. A
+project-level filename is therefore shared by all of them, and the seed is one-use — so an
+unscoped name has sibling windows consume each other's hand-offs, delivering the wrong ticket's
+context to a session that cannot tell. Derive the scope from the two values already in your
+context, with **no tool call**:
+
+1. Encode the absolute cwd: every non-alphanumeric character becomes `-`.
+2. Read the project slug out of `<memoryRoot>` itself — the path component between
+   `projects/` and `/memory`.
+3. **They match** → `<seedFile>` is `seedprompt.md`. **They differ** → `<seedFile>` is
+   **`seedprompt.<encode(cwd)>.md`**.
+
+Use the **whole** encoded cwd, never its last segment: two worktrees with the same folder name
+under different parents would collide. The host's sidecar resolves the identical name, so a
+mismatch here is a seed written where nothing will ever read it. (The slugs also differ for a
+checkout reached through a symlink; scoping there is harmless and keeps the two sides in step.)
 
 Three "not" cases — these are the exact historical failure modes, state them and avoid them:
 
 1. **NOT** in the repo's `doc/` (or anywhere in the working tree). No consumer reads there.
 2. **NOT** inside a `<session_id>/` subdirectory. The seed is project-level, one per project, not
    per-session. (This is where it differs from `modes`, whose `active_modes.md` *is* per-session.)
-3. **NOT** `MEMORY.md` or any other memory file — the filename is exactly `seedprompt.md`.
+3. **NOT** `MEMORY.md` or any other memory file — the filename is exactly `<seedFile>`:
+   `seedprompt.md`, or the folder-scoped `seedprompt.<encode(cwd)>.md` per the rule above.
+   Never invent a different stem, and never scope it when the two slugs match.
 
 **Fallback** (only if the auto-memory dir isn't derivable from the system prompt): compute
-`~/.claude/projects/<encode(cwd)>/memory/seedprompt.md`, where `<encode(cwd)>` replaces **every
-non-alphanumeric character** of the absolute working-directory path with `-` (the same encoding
-Claude Code uses for project dirs; this matches the CCVI host's
-`encodeProjectDir`). E.g. cwd `/Users/keldon/Desktop/working/ccvi-idea`
-→ `-Users-keldon-Desktop-working-ccvi-idea` → `~/.claude/projects/-Users-keldon-Desktop-working-ccvi-idea/memory/seedprompt.md`.
+`~/.claude/projects/<encode(repoDir)>/memory/<seedFile>`, where `<encode(...)>` replaces **every
+non-alphanumeric character** of an absolute path with `-` (the same encoding Claude Code uses for
+project dirs; it matches the CCVI host's `encodeProjectDir`). E.g. cwd
+`/Users/keldon/Desktop/working/ccvi-idea` → `-Users-keldon-Desktop-working-ccvi-idea` →
+`~/.claude/projects/-Users-keldon-Desktop-working-ccvi-idea/memory/seedprompt.md`.
 
-Echo the **resolved absolute path** on every `write` — that echo is the anti-misfire feedback.
+`<repoDir>` is the **repository**, not the cwd, because that is what keys the directory: resolve
+symlinks, then — if `<cwd>/.git` is a **file** (the marker of a worktree) — read its `gitdir:`
+path, read the `commondir` file beside it, and take the parent of the resulting `.git`. If that
+parent is not named `.git`, or anything is missing or unreadable, use the resolved cwd. With
+`<repoDir>` differing from the cwd, `<seedFile>` is scoped exactly as above.
+
+Echo the **resolved absolute path** on every `write`, including the folder-scoped filename when
+one applies — that echo is the anti-misfire feedback, and the suffix is the part a reader can
+actually check against the window they are in.
 
 ## The seed file format
 
@@ -133,7 +163,7 @@ title: "<3-6 words naming what the next session will do>"
 When the verb is blank or unrecognized, reply with exactly this — no preamble, no postscript:
 
 ```text
-/seedprompt · v0.0.23 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
+/seedprompt · v0.0.24 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
 • write [body] — write the pending seed to <memoryRoot>/seedprompt.md (compose from context if no body given)
 • read         — consume the pending seed: print + adopt it, then delete (one-use)
 • show         — print the pending seed's path + contents (or "none pending")
