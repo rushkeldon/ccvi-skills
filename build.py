@@ -197,7 +197,9 @@ MANIFEST_SKILLS = [
       {"name": "review", "params": [_param("pr", False, "freeform")]},
       {"name": "status", "params": [_param("pr", False, "freeform")]},
       {"name": "export", "params": [_param("pr", True, "freeform"),
-                                    _param("dryRun", False, "flag")]},
+                                    _param("dryRun", False, "flag"),
+                                    _param("originPr", False, "freeform")]},
+      {"name": "prune", "params": [_param("dryRun", False, "flag")]},
     ],
   },
 ]

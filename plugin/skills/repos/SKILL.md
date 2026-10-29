@@ -1,6 +1,6 @@
 ---
 name: repos
-description: init•config•sync•open•review•status•export - iterate a PR to polish on a LOCAL forge (Forgejo), then export the refined result - branch, description, and only the unresolved review comments - to the origin (GitHub) as a pending review, via /repos [verb]. Use when the user issues a /repos directive or asks to open, review, or export a PR through the local forge.
+description: init•config•sync•open•review•status•export•prune - iterate a PR to polish on a LOCAL forge (Forgejo), then export the refined result - branch, description, and only the unresolved review comments - to the origin (GitHub) as a pending review, via /repos [verb]. Use when the user issues a /repos directive or asks to open, review, or export a PR through the local forge.
 argument-hint: "[verb] [args]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
@@ -17,8 +17,10 @@ verbs:
                                  { name: base,   type: string, required: false } ] }
   review:  { order: 5, params: [ { name: pr, type: string, required: false } ] }
   status:  { order: 6, params: [ { name: pr, type: string, required: false } ] }
-  export:  { order: 7, params: [ { name: pr,     type: string, required: true },
-                                 { name: dryRun, type: boolean, required: false } ] }
+  export:  { order: 7, params: [ { name: pr,       type: string, required: true },
+                                 { name: dryRun,   type: boolean, required: false },
+                                 { name: originPr, type: string, required: false } ] }
+  prune:   { order: 8, params: [ { name: dryRun, type: boolean, required: false } ] }
 ---
 
 # repos
@@ -43,7 +45,8 @@ One entry point - **`/repos [verb] [args]`** - dispatching on the first arg.
 | `/repos open [branch] [base]` | Push branch to the forge, open/refresh the local PR |
 | `/repos review [pr]` | Claude review of the forge PR → inline forge comments |
 | `/repos status [pr]` | Threads, export preview, preflight warnings |
-| `/repos export {pr} [dryRun]` | Transfer to origin as a pending review |
+| `/repos export {pr} [dryRun] [originPr]` | Transfer to origin as a pending review (onto an existing origin PR with `originPr`) |
+| `/repos prune [dryRun]` | Wipe the ephemeral forge: exported PRs + branches, and unexported ones past 14 days |
 | `/repos` (blank/unknown verb) | Print the help cheat-sheet (see **Help output**) |
 
 ## Forge adapter contract
@@ -71,9 +74,13 @@ the UI):
   emits `resolved: resolver != null`.
 - **Write:** there is NO API endpoint to resolve a conversation - the instance's own
   `/swagger.v1.json` contains zero `resolve` paths (verified). Resolution happens in
-  the Forgejo web UI ("Resolve conversation" on the PR), which is the intended
-  workflow: the user resolves threads as findings are addressed. The reply-marker
-  fallback (branch (b)) is NOT in force and is not implemented.
+  the Forgejo web UI ("Resolve conversation" on the PR). The reply-marker fallback
+  (branch (b)) is NOT in force and is not implemented.
+- **Closing a thread = deleting its comment.** Because the API cannot resolve, the
+  supported way for the agent to close a finding is to **delete the comment**
+  (`forge delete-comment`) once the fix is verified. Export transfers only unresolved
+  threads, so a deleted thread drops out exactly as a resolved one would. Resolving
+  in the web UI still works and counts the same.
 
 ## Config root
 
@@ -96,11 +103,10 @@ the UI):
 
 ## Stage directions
 
-Per-repo standing instructions (e.g. "no mention of AI as a collaborator in commits,
-descriptions, or comments") stored as the entry's `directions.md`. Consumed by every
-verb that writes prose (`open` drafting, `review` phrasing) and **enforced** by
-`export`/`status` preflight - a commit-trailer scan for AI-attribution trailers
-(`Co-Authored-By: … Claude`, `Generated with …`) before anything is pushed to origin.
+Per-repo standing instructions (e.g. "keep PR descriptions under 200 words") stored
+as the entry's `directions.md`. Consumed by every verb that writes prose (`open`
+drafting, `review` phrasing), and checked by `status` and `export` wherever a
+direction can be checked statically against the PR title, description, and comments.
 
 ## Templates
 
@@ -126,6 +132,12 @@ forge pr          --repo R --branch B [--base BASE] [--title T --body-file F]
                                                 create-or-get -> {number, url, existing}
 forge threads     --repo R --pr N               all inline comments -> see shape below
 forge comment     --repo R --pr N --path P --line L --body-file F
+forge delete-comment --repo R --pr N --comment C
+                                                finds the comment's review, DELETEs it
+                                                -> {deleted: true, comment_id}
+forge prune       [--dry-run]                   classify + delete forge PRs and branches
+                                                (see Verb: prune); exit 1 if any delete
+                                                failed
 forge check-git-credentials [--remote NAME]     helper + keychain + ls-remote probe
                                                 -> {ok, next_action}; exit 0 iff ok
 github export     --repo R --branch B --base BASE --title T --body-file F
@@ -134,6 +146,12 @@ github export     --repo R --branch B --base BASE --title T --body-file F
                                                 replays comments by head_line (required);
                                                 gh runs with GH_HOST derived from the
                                                 origin remote (a preset GH_HOST wins)
+github export     --repo R --pr N --comments-file J [--dry-run]
+                                                attach ONE pending review to existing
+                                                origin PR N; creates no PR, so branch,
+                                                base, title, and body are not needed;
+                                                --dry-run prints target.existing_pr
+                                                instead of target.create_pr
 ```
 
 **`forge threads` output shape** (the export pipeline's input):
@@ -371,6 +389,11 @@ comments. `pr` defaults to the current branch's open forge PR.
   `/repos/{owner}/{repo}/pulls/{index}/reviews/{id}/comments/{comment}` (works
   with the provisioned scopes), then repost via `forge comment`. The comment id
   changes; the thread's resolved state starts over.
+- **Close fixed findings by deleting them.** On a re-review, for each open thread
+  whose fix you have verified in the current code, delete its comment with `forge
+  delete-comment --repo R --pr N --comment C` (the forge API has no resolve
+  endpoint; see the Forge adapter contract). Leave unverified fixes open. A thread
+  the user resolved in the web UI is already closed - leave it alone.
 - No severity theater. A finding the session is unsure of says so plainly.
 - **Chat output is a summary; the forge comments are the durable artifact.**
 - (Wrapping the built-in /code-review skill was considered and REJECTED for v1: its
@@ -381,7 +404,9 @@ comments. `pr` defaults to the current branch's open forge PR.
 
 **`/repos status [pr]`** - the dashboard. `pr` defaults like `review`. Reports:
 
-1. **Thread counts:** open vs resolved, from `forge threads --repo R --pr N`.
+1. **Thread counts:** open vs resolved, from `forge threads --repo R --pr N`. A
+   thread closed by deleting its comment no longer appears at all, so it counts
+   exactly like one resolved in the web UI: it is not open and does not export.
 2. **Export preview:** each unresolved root comment as `path:head_line - body`
    (exactly what `export` would replay). An `outdated: true` thread renders as
    `path - body [OUTDATED - will be excluded from export]`; the summary counts
@@ -389,23 +414,26 @@ comments. `pr` defaults to the current branch's open forge PR.
 3. **Base drift:** `git fetch origin <base>` then
    `git rev-list --count <branch>..origin/<base>` - commits the base has gained.
    Drifted? `/repos sync` brings the forge's copy of the base current.
-4. **Preflight warnings:**
-   - AI-attribution trailers in the branch's commits:
-     `git log <base>..<branch> --format=%B | grep -Ei 'Co-Authored-By:.*Claude|Generated with'`
-   - any stage-directions violations checkable statically (scan the PR title,
-     description, and comment drafts against the directions).
+4. **Preflight warnings:** any stage-directions violations checkable statically
+   (scan the PR title, description, and comment drafts against the directions).
 
 ## Verb: export
 
-**`/repos export {pr} [dryRun]`** - the one outward-facing verb; `pr` is REQUIRED
-(naming it is the guard). Transfers the polished result to the origin as a PENDING
-review.
+**`/repos export {pr} [dryRun] [originPr]`** - the one outward-facing verb; `pr` (the
+FORGE PR) is REQUIRED (naming it is the guard). Transfers the polished result to the
+origin as a PENDING review.
+
+**`originPr`** names an EXISTING origin PR - typically someone else's PR whose review
+was polished on the forge. With it, export creates no PR and pushes nothing: it
+attaches the single pending review to PR `originPr` (`github export --pr
+<originPr>`), still replaying comments by `head_line`. The existing PR keeps its own
+title and description; the forge PR's are not transferred.
 
 **Steps, in order:**
 
-1. **Preflight:** the trailer scan and directions check from `status`. **Any hit =
-   STOP and surface**; offer the history-rewrite fix (e.g. interactive rebase
-   commands) but NEVER run it - the user rewrites, then re-invokes export.
+1. **Preflight:** the directions check from `status`. **Any hit = STOP and
+   surface**; the user fixes the title, description, or comment on the forge, then
+   re-invokes export.
 2. **Collect the payload:** `forge threads`, keep `resolved == false` entries only,
    root comments only; the forge PR's title + description **verbatim** (no template
    re-application). Comments-JSON entries carry the thread fields as `forge
@@ -416,10 +444,14 @@ review.
    exclusion naming its `path` and the first line of its `body` - the user
    resolves or rewords those comments on the forge first. (`github export` also
    refuses a comments file carrying `outdated` entries - belt and braces.)
-3. **`dryRun`:** print branch, base, title, description, and every surviving
-   comment with its `path:line` anchor - via `github export ... --dry-run` - touch
+3. **`dryRun`:** print the target - the PR to create (branch, base, title,
+   description) or, with `originPr`, the existing PR number - and every surviving
+   comment with its `path:line` anchor, via `github export ... --dry-run`; touch
    nothing, end.
 4. **Live run:** confirm with the user (outward action), then:
+   - **With `originPr`:** skip the push and run `github export --repo
+     <owner>/<repo> --pr <originPr> --comments-file ...` - ONE pending review on that
+     PR. Echo its URL + "pending review staged - submit it in the GitHub UI". Done.
    - `git push origin <branch>`
    - `github export --repo <owner>/<repo> --branch <branch> --base <base> --title
      ... --body-file ... --comments-file ...` - creates the origin PR and ONE
@@ -429,20 +461,55 @@ review.
 **Nothing resolved transfers.** Resolved threads transfer nothing; reply chains
 transfer nothing - root comments of unresolved threads only.
 
+## Verb: prune
+
+**`/repos prune [dryRun]`** - wipe the ephemeral forge. The forge exists only to get
+a PR into shape before it goes to the origin, so finished and abandoned work is
+cleared periodically. Run `python3 tools/repos_api.py forge prune [--dry-run]` and
+relay its report.
+
+**What it does, per forge repo** (every repo the forge token can see):
+
+- **Matching the origin:** a forge repo maps to the manifest origin whose repo
+  basename equals the forge repo's name (`open` names the forge repo after the
+  origin's basename). An unmatched forge repo is reported as such
+  (`origin_check`), and all its branches are treated as unexported.
+- **Items** are the repo's branches plus the head branches of its PRs (open or
+  closed); each item carries its forge PR numbers.
+- **The base branch is never deleted** - the forge repo's default branch and the
+  manifest entry's `base`.
+- **Exported** = the origin has a PR (any state) for that branch, checked with `gh
+  api` against the origin's own host (`GH_HOST` from the origin URL). Exported items
+  are deleted - PRs and branch - at any time.
+- **Unexported** items are deleted only once **stale: 14 days or more** since the
+  newest of the branch head commit and its PRs' `updated_at`. Fresher ones are kept
+  and listed with a warning. A failed origin check counts as unexported (reported in
+  `origin_check`); an item with no timestamp at all is kept.
+- **Deleting** a PR uses the issue DELETE endpoint (`DELETE
+  /repos/{owner}/{repo}/issues/{index}`; a PR is an issue), then the branch is
+  deleted. A failed delete is reported per item and the run continues; the tool
+  exits 1 if any failed.
+
+**`dryRun`** prints the same classification (`would_delete`, `kept`) and changes
+nothing. Prune deletes local forge data only - never anything on the origin - so a
+live run needs no outward-action confirmation, but a first prune on a forge is
+best previewed with `dryRun`.
+
 ## Help output
 
 When the user runs `/repos` with a blank or unrecognized verb (or asks "what can
 /repos do?"), reply with exactly this - no preamble, no postscript:
 
 ```text
-/repos · v0.0.24 — local-forge PR pipeline:
+/repos · v0.0.25 — local-forge PR pipeline:
 • init                              — one-time: install + configure the local forge
 • config {kind} [origin] [value]    — per-repo config: template | directions | base
 • sync [force]                      — push base + current branch to the forge; no PR
 • open [branch] [base]              — push branch to forge, open/refresh local PR
 • review [pr]                       — Claude review -> inline forge comments
 • status [pr]                       — threads, export preview, preflight warnings
-• export {pr} [dryRun]              — transfer to origin as a pending review
+• export {pr} [dryRun] [originPr]   — transfer to origin as a pending review
+• prune [dryRun]                    — wipe exported + stale (14d+) forge PRs and branches
 
 Polish locally, export deliberately: only unresolved root comments transfer,
 as a PENDING GitHub review a human submits.
@@ -460,5 +527,3 @@ as a PENDING GitHub review a human submits.
   comments of unresolved threads only.
 - **No GitLab adapter** - Forgejo (Gitea-compatible) is the only backend.
 - **No delegation** - every verb runs inline in the session.
-- **No commit-history rewriting** - preflight detects AI trailers and instructs; the
-  user runs the rewrite.
