@@ -98,8 +98,8 @@ Plan Editor. Five non-negotiable rules whenever you write or edit a plan file:
    containing embedded `"quotes"` or a `colon-space` sequence collapses the **entire**
    frontmatter block and blanks every todo at once — a symptom that looks far worse than
    "one bad field." Wrap such values in double quotes and escape inner quotes, **or**
-   validate with the bundled checker — `node tools/plan-check.cjs <file>` (resolved
-   against the skill's base dir; see **Validating a plan** below) — which round-trips the
+   validate with the bundled checker — `~/.ccvi/node/current/bin/node tools/plan-check.cjs
+   <file>` (both the checker and `node` resolved per **Validating a plan** below) — which round-trips the
    frontmatter through a vendored js-yaml (the parser class Cursor itself uses). If Node
    is unavailable, fall back to a YAML round-trip via
    `python3 -c "import yaml,sys; yaml.safe_load(sys.stdin.read())"` or
@@ -130,8 +130,9 @@ Plan Editor. Five non-negotiable rules whenever you write or edit a plan file:
    than a tagged one. **Why:** plan renderers syntax-paint fences, auto-detecting
    untagged ones as *some* language — untagged prose comes out as keyword confetti.
 
-> **After any frontmatter write, validate it parses** — run `node tools/plan-check.cjs
-> <file>` (or the python/ruby fallback if Node is absent; see **Validating a plan**).
+> **After any frontmatter write, validate it parses** — run
+> `~/.ccvi/node/current/bin/node tools/plan-check.cjs <file>` (node resolved per **Validating a
+> plan**, which also gives the python/ruby fallback).
 > If it doesn't pass, you've corrupted the plan — fix before proceeding, don't leave it broken.
 
 ## Validating a plan
@@ -141,11 +142,19 @@ runtime hunt). Run it after any frontmatter write, and as the mechanical-lint pa
 `review`:
 
 ```sh
-node tools/plan-check.cjs <file.plan.md>
+~/.ccvi/node/current/bin/node tools/plan-check.cjs <file.plan.md>
 ```
 
 - **Resolve `tools/plan-check.cjs` against the skill's base dir** (the absolute base dir
   is given to you at skill-invocation time) — not the cwd of the plan being checked.
+- **Resolve `node` through the CCVI pointer, in this order.** `~/.ccvi/node/current/bin/node`
+  is the runtime CCVI carries and keeps patched — a symlink the host retargets on a pin bump,
+  so naming it needs no version and goes stale on nobody's schedule (contract:
+  ccvi-idea `doc/contracts/captive_node_current.md`). If it is not executable, fall back to
+  plain `node` on PATH; if that is missing too, use the **No-Node fallback** below. Prefer the
+  pointer over PATH deliberately: PATH `node` is whatever a shell happens to have, which on a
+  machine with a vendor-managed `node` ahead of nvm can be an unpatched runtime, and nothing in
+  a plan check would ever reveal it.
 - **Bundled + vendored — no install, no network, offline.** It `require`s a vendored
   js-yaml (`tools/vendor/js-yaml.min.js`, pinned MIT) — the same parser class Cursor's
   plans panel uses, so "passes this" closely tracks "Cursor will render it."
@@ -157,7 +166,7 @@ node tools/plan-check.cjs <file.plan.md>
 - **Exit contract:** exit `0` and print `plan-check OK — N todos; statuses: …;
   isProject=…` on success; exit `1` and print `plan-check FAIL <file>:` followed by one
   `- <problem>` line per issue on failure.
-- **No-Node fallback** (if Node is unavailable): round-trip the frontmatter through any
+- **No-Node fallback** (pointer absent AND no `node` on PATH): round-trip the frontmatter through any
   YAML parser instead — `python3 -c "import yaml,sys; yaml.safe_load(sys.stdin.read())"`
   or `ruby -ryaml -e 'YAML.safe_load(STDIN.read)'`. This only confirms it parses; it
   doesn't check the invariants above.
@@ -485,8 +494,8 @@ control, so a bad apply is a `git` rollback away.
    `MINOR >= 9`, roll to `(MAJOR+1).0` (e.g. `1.9` → `2.0`). Write it back **surgically** as
    a quoted string `version: "X.Y"` — replace the existing `version:` line, or insert one
    immediately after `name:` if absent. This bump happens on **every** `update` (review or
-   verify). Validate the frontmatter parses after the write (`node tools/plan-check.cjs
-   <file>`).
+   verify). Validate the frontmatter parses after the write
+   (`~/.ccvi/node/current/bin/node tools/plan-check.cjs <file>`).
 
 1. **Read & validate the report.** The report is **markdown** with an optional leading `plan:` frontmatter (per the report contract). **Skip that frontmatter when extracting findings** — findings live in the body; and if `[plan.md]` was omitted, **resolve it from the report's `plan:` ref** (relative to the report's directory) before applying, else fall back to the normal argument-resolution. Then
    extract each finding's **bolded todo-id**, its inline **`[verdict]`** tag, and its
@@ -527,7 +536,7 @@ control, so a bad apply is a `git` rollback away.
    ```
    Append (oldest-first) — never reorder existing entries. Write **nothing** to the body: the
    plan-editor renders the "Plan Revision History" section from this YAML. Validate the
-   frontmatter parses (`node tools/plan-check.cjs <file>`).
+   frontmatter parses (`~/.ccvi/node/current/bin/node tools/plan-check.cjs <file>`).
 
 **Do not auto-commit the post-bump/post-apply result** — step 0a's snapshot is the restore
 point; the user reviews the applied update and commits it per their normal cadence.
@@ -585,7 +594,7 @@ verbatim, never reflowed (it is byte-identical to the one in the repo README, an
 `build.py --check` enforces that):
 
 ```diagram
-/plans · v0.0.25 — lifecycle verbs for *.plan.md files:
+/plans · v0.0.26 — lifecycle verbs for *.plan.md files:
 • write  [name]                                    — author the discussed plan into a *.plan.md
 • review [plan.md] [out] [model]                   — vet the plan's quality → report card
 • verify [plan.md] [out] [model]                   — audit each todo's status vs. reality → report card
