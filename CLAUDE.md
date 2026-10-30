@@ -31,6 +31,48 @@ ccvi-skills/
   ccvi-skills.zip                    - built artifact: the plugin/ tree at zip root
 ```
 
+## Skill shape - one skill per noun, references per verb
+
+**The rule.** One skill per noun. Keep the verb surface on that skill, keep the host
+`verbs:` schema single-sourced, keep shared doctrine stated once, and push verb-specific
+depth into `references/` files that load only when that verb runs.
+
+**Why it needs stating: a SKILL.md body loads WHOLE on invocation.** Measured
+2026-10-29: `modes` 731 lines / ~16.6k tokens, `plans` 694 / ~10.4k, `cleancode` 669 /
+~10.0k, `repos` 529 / ~7.7k, `seedprompt` 195 / ~3.1k. That cost is real, and it makes
+splitting a fat skill into one-skill-per-verb look attractive - each body would be small.
+On token arithmetic alone it even wins, because descriptions are always resident while
+bodies are conditional: ten thin skills cost a few hundred tokens of description forever
+to save ~14k on the turns that invoke them.
+
+Resist it anyway, for three costs that do not appear in a token count:
+
+- **The host verb schema is a consumer contract.** `plans` and `repos` carry a
+  machine-readable `verbs:` block in frontmatter that CCVI reads to render its verb menu
+  in lifecycle `order` and to generate each verb's dialog from `params`. One skill owns
+  that ordered list. Split the skill and the picker has no skill to read - this breaks
+  CCVI's UI, not just its ergonomics.
+- **The thick part of a skill is SHARED, not per-verb.** `modes`' bulk is the storage
+  location, the session-id resolution, the echo contract, the PreToolUse hook, the host
+  sentinel fast path, and the write-unconditionally rule - none of which belong to one
+  verb. Split it and that half either duplicates per skill (N copies that drift, the
+  hand-mirrored-defect hazard multiplied) or moves behind a reference every one of them
+  must load, which restores the tokens and adds a hop.
+- **Dispatch gets less reliable.** With one skill the agent invokes it and then routes to
+  the verb *with the doctrine already in context*. With one skill per verb the model picks
+  from one-line descriptions having read no doctrine. Choosing `exclude` when the user
+  meant `include` is a wrong action, not a slow one.
+
+**So when a SKILL.md gets heavy, move depth OUT, do not break the skill UP.** `cleancode`
+is the worked example: a thin body beside `references/comment_conventions.md` and
+`references/naming_conventions.md`, read on demand. At 8-10k, `plans`, `cleancode`, and
+`repos` are fine and need nothing. `modes` is the one outlier, and its remedy is the same
+move, not a restructuring.
+
+**Corollary for a new skill:** verbs that share an invariant belong on one skill. Two
+verbs whose correctness depends on the same rule must not be able to drift, and separate
+skills are exactly how that rule ends up stated twice.
+
 ## The tight-coupling doctrine
 
 - The three skills ship together and **may assume each other is present**
