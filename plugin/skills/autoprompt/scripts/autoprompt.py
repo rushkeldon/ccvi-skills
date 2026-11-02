@@ -42,18 +42,19 @@ from pathlib import Path
 # editorId -> minimum installed CCVI version for each capability, or None = unsupported.
 # "single": consumes <gitDir>/ccvi/auto_prompt.md. "numbered": also drains auto_prompt_<N>.md.
 #
-# Probed 2026-11-01 (gate-consumers):
+# Probed 2026-11-01 (gate-consumers), re-probed 2026-11-02:
 # - ccvi-idea 0.4.168 is the first build reading <gitDir>/ccvi/ (0.4.167 read <repoRoot>/).
-#   ../ccvi-idea/doc/contracts/auto_prompt.md still says "One fixed name" at HEAD 4f33995
-#   (BBP 0.4.168), so numbered is None until ccvi-idea ships
-#   doc/auto_prompt_numbered_file_queue.plan.md and names its floor.
+# - ccvi-idea 0.4.169 (08390bd) is the first build draining numbered slots; its contract
+#   documents them. Below it the consumer stats only the bare name, so a numbered drop would
+#   strand silently - hence a hard >= floor, never best-effort. Re-probed 2026-11-02 after
+#   install: IntelliJIdea2026.2 and AndroidStudio2026.1.4 both carry ccvi-idea-0.4.169.jar.
 # - ccvi-vscode has no consumer of its own; it compiles ccvi-idea's sidecar in at build time.
 #   `grep -rlF 'auto_prompt(?:_'` and `grep -rlF 'auto_prompt.md'` over out/ and dist/ of
 #   ~/.vscode/extensions/appcloud9.ccvi-vscode-{1.2.32,1.2.33} and
 #   ~/.cursor/extensions/appcloud9.ccvi-vscode-{1.2.3,1.2.31}: zero matches. Unsupported.
 FLOORS = {
-    "as":     {"single": "0.4.168", "numbered": None},
-    "idea":   {"single": "0.4.168", "numbered": None},
+    "as":     {"single": "0.4.168", "numbered": "0.4.169"},
+    "idea":   {"single": "0.4.168", "numbered": "0.4.169"},
     "vscode": {"single": None,      "numbered": None},
     "cursor": {"single": None,      "numbered": None},
 }
