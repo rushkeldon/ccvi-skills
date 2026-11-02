@@ -34,11 +34,11 @@ todos:
     phase: "Verify"
   - id: live-smoke
     content: "Run a real send into this repo's own live CCVI window with shouldStartIDE false and confirm the turn arrives and the drop is consumed"
-    status: in_progress
+    status: completed
     phase: "Verify"
   - id: bbpi
     content: "BBPI per CLAUDE.md - bump, build, check, test, commit and push, install - and confirm /autoprompt registers"
-    status: in_progress
+    status: completed
     phase: "Verify"
 isProject: false
 ---
