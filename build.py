@@ -66,6 +66,8 @@ STAMPS = [
    re.compile(r"/cleancode · v\d+\.\d+\.\d+"), "/cleancode · v{v}"),
   (p("plugin", "skills", "repos", "SKILL.md"),
    re.compile(r"/repos · v\d+\.\d+\.\d+"), "/repos · v{v}"),
+  (p("plugin", "skills", "autoprompt", "SKILL.md"),
+   re.compile(r"/autoprompt · v\d+\.\d+\.\d+"), "/autoprompt · v{v}"),
 ]
 
 README = p("README.md")
@@ -200,6 +202,19 @@ MANIFEST_SKILLS = [
                                     _param("dryRun", False, "flag"),
                                     _param("originPr", False, "freeform")]},
       {"name": "prune", "params": [_param("dryRun", False, "flag")]},
+    ],
+  },
+  {
+    "name": "autoprompt",
+    "invocation": "/autoprompt [verb] [args]",
+    "verbs": [
+      {"name": "send", "params": [_param("projectDir", True, "dir"),
+                                  _param("prompt", False, "freeform"),
+                                  _param("shouldStartIDE", False, "flag", "1")]},
+      {"name": "show", "params": [_param("projectDir", False, "dir")]},
+      {"name": "clear", "params": [_param("projectDir", True, "dir")]},
+      {"name": "config", "params": [_param("key", False, "freeform"),
+                                    _param("value", False, "freeform")]},
     ],
   },
 ]

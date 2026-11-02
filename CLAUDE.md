@@ -22,7 +22,13 @@ ccvi-skills/
     skills/plans/SKILL.md
     skills/plans/tools/              - plan-check.cjs, archive-plans.sh, vendor/js-yaml.min.js
     skills/seedprompt/SKILL.md
+    skills/cleancode/SKILL.md
+    skills/cleancode/references/       - per-verb depth, read on demand
+    skills/repos/SKILL.md
+    skills/autoprompt/SKILL.md
+    skills/autoprompt/scripts/autoprompt.py - autoprompt fast-path script
   test/test_modes.py                 - golden harness; dev-only, never packaged
+  test/test_autoprompt.py            - autoprompt script tests; dev-only, never packaged
   build.py                           - stamp + README + manifest + zip + --check
   manifest.json                      - built artifact: signatures contract for hosts
   doc/                               - plans live here; doc/archive/ for finished ones

@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.26",
+  "version": "0.0.27",
   "skills": [
     {
       "name": "modes",
@@ -501,6 +501,68 @@
               "name": "dryRun",
               "required": false,
               "kind": "flag"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "autoprompt",
+      "invocation": "/autoprompt [verb] [args]",
+      "verbs": [
+        {
+          "name": "send",
+          "params": [
+            {
+              "name": "projectDir",
+              "required": true,
+              "kind": "dir"
+            },
+            {
+              "name": "prompt",
+              "required": false,
+              "kind": "freeform"
+            },
+            {
+              "name": "shouldStartIDE",
+              "required": false,
+              "kind": "flag",
+              "default": "1"
+            }
+          ]
+        },
+        {
+          "name": "show",
+          "params": [
+            {
+              "name": "projectDir",
+              "required": false,
+              "kind": "dir"
+            }
+          ]
+        },
+        {
+          "name": "clear",
+          "params": [
+            {
+              "name": "projectDir",
+              "required": true,
+              "kind": "dir"
+            }
+          ]
+        },
+        {
+          "name": "config",
+          "params": [
+            {
+              "name": "key",
+              "required": false,
+              "kind": "freeform"
+            },
+            {
+              "name": "value",
+              "required": false,
+              "kind": "freeform"
             }
           ]
         }
