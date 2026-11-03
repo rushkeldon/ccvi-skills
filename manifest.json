@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "skills": [
     {
       "name": "modes",
@@ -562,6 +562,115 @@
             {
               "name": "value",
               "required": false,
+              "kind": "freeform"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hashcmd",
+      "invocation": "/hashcmd [verb] [args]",
+      "verbs": [
+        {
+          "name": "write",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "scope",
+              "required": false,
+              "kind": "freeform",
+              "default": "project"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "params": [
+            {
+              "name": "scope",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "show",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "move",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "scope",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "archive",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pages",
+      "invocation": "/pages [verb] [args]",
+      "verbs": [
+        {
+          "name": "write",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "scope",
+              "required": false,
+              "kind": "freeform",
+              "default": "project"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "params": [
+            {
+              "name": "scope",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "url",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
               "kind": "freeform"
             }
           ]

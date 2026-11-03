@@ -68,6 +68,10 @@ STAMPS = [
    re.compile(r"/repos · v\d+\.\d+\.\d+"), "/repos · v{v}"),
   (p("plugin", "skills", "autoprompt", "SKILL.md"),
    re.compile(r"/autoprompt · v\d+\.\d+\.\d+"), "/autoprompt · v{v}"),
+  (p("plugin", "skills", "hashcmd", "SKILL.md"),
+   re.compile(r"/hashcmd · v\d+\.\d+\.\d+"), "/hashcmd · v{v}"),
+  (p("plugin", "skills", "pages", "SKILL.md"),
+   re.compile(r"/pages · v\d+\.\d+\.\d+"), "/pages · v{v}"),
 ]
 
 README = p("README.md")
@@ -215,6 +219,29 @@ MANIFEST_SKILLS = [
       {"name": "clear", "params": [_param("projectDir", True, "dir")]},
       {"name": "config", "params": [_param("key", False, "freeform"),
                                     _param("value", False, "freeform")]},
+    ],
+  },
+  {
+    "name": "hashcmd",
+    "invocation": "/hashcmd [verb] [args]",
+    "verbs": [
+      {"name": "write", "params": [_param("name", True, "freeform"),
+                                   _param("scope", False, "freeform", "project")]},
+      {"name": "list", "params": [_param("scope", False, "freeform")]},
+      {"name": "show", "params": [_param("name", True, "freeform")]},
+      {"name": "move", "params": [_param("name", True, "freeform"),
+                                  _param("scope", True, "freeform")]},
+      {"name": "archive", "params": [_param("name", True, "freeform")]},
+    ],
+  },
+  {
+    "name": "pages",
+    "invocation": "/pages [verb] [args]",
+    "verbs": [
+      {"name": "write", "params": [_param("name", True, "freeform"),
+                                   _param("scope", False, "freeform", "project")]},
+      {"name": "list", "params": [_param("scope", False, "freeform")]},
+      {"name": "url", "params": [_param("name", True, "freeform")]},
     ],
   },
 ]
