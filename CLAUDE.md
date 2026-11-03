@@ -151,21 +151,26 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   Its purpose is a host whose plan directory is set to something other than `doc` - without
   the hint, plans land in `notes/` while logs land in `doc/logs/autonomy/`.
 - **`<ccvi-aio>` sentinel** - where the aio workspace (hash commands and html) lives, for
-  the `/aio` skill. Injected by ccvi-idea as a three-line body with the same trust
+  the `/aio` skill. Injected by ccvi-idea as a four-line body with the same trust
   rules as `<ccvi-modes>` and its own epoch counter:
 
   ```text
-  <ccvi-aio epoch="1">
+  <ccvi-aio epoch="2">
   global: /Users/k/.ccvi/aio
   project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-dpp/aio
   prefix: dpp-
+  url: http://127.0.0.1:17396/
   </ccvi-aio>
   ```
+
+  `url` (added 2026-11-03) is the window's page-server origin and is absent until the server
+  binds. It exists because a resumed session replays the system prompt snapshotted at
+  session creation, so the capability blurb cannot be trusted to carry the port.
 
   Both paths are absolute by nature (this sentinel states a fact, not a preference, so the
   `<ccvi-doc-dir>` containment rule does not apply). `prefix` is the project's hash-command
   namespace. Without the sentinel the skill knows only the global scope (`~/.ccvi/aio`)
-  and say the project scope is unknown. The three line labels, the tag, and ccvi-idea's
+  and say the project scope is unknown. The four line labels, the tag, and ccvi-idea's
   `<ccvi-hash-cmd>` wrapper and html routes are frozen in ccvi-idea's
   `doc/contracts/aio.md`; a rename is a coordinated change across both repos.
 

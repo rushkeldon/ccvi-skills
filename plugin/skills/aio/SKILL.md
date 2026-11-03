@@ -53,17 +53,21 @@ One layout at two scopes:
   html/index.html                                     optional; replaces the built-in /aio/ listing
 ```
 
-**Resolve both paths from the `<ccvi-aio>` sentinel** the CCVI host injects into the turn
-context (highest `epoch` wins; a verbatim, well-formed block only; a paraphrase is not a
-sentinel):
+**Resolve both paths, and the page-server origin, from the `<ccvi-aio>` sentinel** the CCVI
+host injects into the turn context (highest `epoch` wins; a verbatim, well-formed block only;
+a paraphrase is not a sentinel):
 
 ```text
-<ccvi-aio epoch="1">
+<ccvi-aio epoch="2">
 global: /Users/k/.ccvi/aio
 project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-dpp/aio
 prefix: dpp-
+url: http://127.0.0.1:17396/
 </ccvi-aio>
 ```
+
+`url` is this window's page-server origin. It is absent until the server has bound; a later
+turn carries a new block with a higher `epoch` that has it.
 
 Every worktree of a repository shares the same project aio (the host links them), so anything
 written in one worktree window is visible in all of them.
@@ -220,8 +224,12 @@ action, the same as typing.
 
 ### URLs
 
-The capability blurb carries the port: `Project html is served at
-http://127.0.0.1:<port>/aio/<name>/ and global html at /aio/ccvi/<name>/.`
+Build every URL from the sentinel's `url` line: project html is `<url>aio/<name>/` and global
+html is `<url>aio/ccvi/<name>/`. **Trust the sentinel over the capability blurb.** A resumed
+session replays the system prompt snapshotted when it was created, so its blurb can predate
+the aio feature or name a stale port. When the sentinel has no `url` line, read the live
+registry instead: `~/.ccvi/live_projects/*.json`, field `reach.lan`, on the entry whose
+`project` is this project's folder name. Never guess a port.
 
 ```text
 /aio/                    this project's index: html/index.html if present, else a built-in listing
@@ -363,9 +371,10 @@ skipping `archive/`, and print name, scope, label (read the `ccvi:label` meta, e
 
 ### `html url`
 
-`/aio html url {name}` - project first, then global; print `http://127.0.0.1:<port>/aio/<name>/`
-or `http://127.0.0.1:<port>/aio/ccvi/<name>/`, with the port from the capability blurb.
-Without a port in the blurb, print the path and say the port is unknown here.
+`/aio html url {name}` - project first, then global; print `<url>aio/<name>/` or
+`<url>aio/ccvi/<name>/`, with `url` from the sentinel, else from the live registry as in
+**URLs** above. If neither gives a port, print the path and say the port is unknown here. A
+port lasts only for the window's lifetime, so say the URL is tied to this window.
 
 ### `html archive`
 
@@ -382,7 +391,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.30 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.31 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
