@@ -150,8 +150,8 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   ccvi-idea emits it**: without it `<docDir>` falls back to probing for `doc/` or `docs/`.
   Its purpose is a host whose plan directory is set to something other than `doc` - without
   the hint, plans land in `notes/` while logs land in `doc/logs/autonomy/`.
-- **`<ccvi-aio>` sentinel** - where the aio workspace (hash commands and pages) lives, for
-  `/hashcmd` and `/pages`. Injected by ccvi-idea as a three-line body with the same trust
+- **`<ccvi-aio>` sentinel** - where the aio workspace (hash commands and html) lives, for
+  the `/aio` skill. Injected by ccvi-idea as a three-line body with the same trust
   rules as `<ccvi-modes>` and its own epoch counter:
 
   ```text
@@ -164,9 +164,9 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
 
   Both paths are absolute by nature (this sentinel states a fact, not a preference, so the
   `<ccvi-doc-dir>` containment rule does not apply). `prefix` is the project's hash-command
-  namespace. Without the sentinel the two skills know only the global scope (`~/.ccvi/aio`)
+  namespace. Without the sentinel the skill knows only the global scope (`~/.ccvi/aio`)
   and say the project scope is unknown. The three line labels, the tag, and ccvi-idea's
-  `<ccvi-hash-cmd>` wrapper and page routes are frozen in ccvi-idea's
+  `<ccvi-hash-cmd>` wrapper and html routes are frozen in ccvi-idea's
   `doc/contracts/aio.md`; a rename is a coordinated change across both repos.
 
 ## BBP / BBPI - bump, build, push, install (the end-of-work ritual)

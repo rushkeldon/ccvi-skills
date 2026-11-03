@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "skills": [
     {
       "name": "modes",
@@ -569,11 +569,11 @@
       ]
     },
     {
-      "name": "hashcmd",
-      "invocation": "/hashcmd [verb] [args]",
+      "name": "aio",
+      "invocation": "/aio [noun] [verb] [args]",
       "verbs": [
         {
-          "name": "write",
+          "name": "hashcmd write",
           "params": [
             {
               "name": "name",
@@ -589,7 +589,7 @@
           ]
         },
         {
-          "name": "list",
+          "name": "hashcmd list",
           "params": [
             {
               "name": "scope",
@@ -599,7 +599,7 @@
           ]
         },
         {
-          "name": "show",
+          "name": "hashcmd show",
           "params": [
             {
               "name": "name",
@@ -609,7 +609,7 @@
           ]
         },
         {
-          "name": "move",
+          "name": "hashcmd move",
           "params": [
             {
               "name": "name",
@@ -624,7 +624,7 @@
           ]
         },
         {
-          "name": "archive",
+          "name": "hashcmd archive",
           "params": [
             {
               "name": "name",
@@ -632,15 +632,9 @@
               "kind": "freeform"
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "pages",
-      "invocation": "/pages [verb] [args]",
-      "verbs": [
+        },
         {
-          "name": "write",
+          "name": "html write",
           "params": [
             {
               "name": "name",
@@ -656,7 +650,7 @@
           ]
         },
         {
-          "name": "list",
+          "name": "html list",
           "params": [
             {
               "name": "scope",
@@ -666,7 +660,17 @@
           ]
         },
         {
-          "name": "url",
+          "name": "html url",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "html archive",
           "params": [
             {
               "name": "name",
