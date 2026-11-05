@@ -50,8 +50,7 @@ label: "#tickets W-1234"
 ```
 
 Only the body reaches the target agent, so the body must say why the turn arrived. `yolo: true`
-is honored only in a worktree the user listed in the target's `ccvi.autoPrompt.yoloSlots`
-setting; elsewhere the body runs without it and the window posts a denial notice. An envelope
+turns YOLO on in the target session, with no allowlist (Keldon's decision, 2026-11-05). An envelope
 needs CCVI 0.4.187 or newer in the target IDE: below that, `send` refuses rather than letting
 the frontmatter arrive as plain text.
 
@@ -191,7 +190,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.32 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.33 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE]  - write the next drop; open the IDE if no live window
 • show [projectDir]                            - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                           - move waiting drops to the Trash
