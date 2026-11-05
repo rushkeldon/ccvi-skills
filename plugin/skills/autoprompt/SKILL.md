@@ -76,6 +76,10 @@ off to the dpp agent" -> `send`; "what's waiting for android-dmgz?" -> `show`.
 - **No `/` and no leading `~`** -> a project name, joined onto `workingDir` (config; default:
   the parent of the current repo). A name containing `..` is refused.
 - **Otherwise** a path: `~` expanded, relative paths against the cwd.
+- **An absolute path is the reliable form** - it skips name resolution and the cwd entirely.
+  Prefer it when sending from an agent whose cwd you do not control: IntelliJ's cwd is the
+  project dir, but VS Code's is the user's home, so a bare name or a relative path resolves
+  somewhere different depending on the host.
 - It must be a git checkout. A worktree resolves to its own git dir, so a drop for
   `android-dmgz-3` reaches only the window open on that worktree.
 
@@ -193,7 +197,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.34 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.35 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE]  - write the next drop; open the IDE if no live window
 • show [projectDir]                            - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                           - move waiting drops to the Trash

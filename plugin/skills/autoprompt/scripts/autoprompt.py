@@ -194,8 +194,8 @@ def resolve_project(raw):
             raise Refusal("project name %r may not contain '..'" % raw)
         wd = working_dir()
         if not wd:
-            raise Refusal("no workingDir to resolve %r against - set it: "
-                          "/autoprompt config workingDir <dir>" % raw)
+            raise Refusal("no workingDir to resolve %r against - pass an absolute path "
+                          "instead, or set it: /autoprompt config workingDir <dir>" % raw)
         candidate = Path(wd) / raw
     else:
         candidate = Path(os.path.expanduser(raw))
