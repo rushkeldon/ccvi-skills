@@ -141,9 +141,12 @@ relay the `refused:` line and stop - do not retry with different arguments unask
 
 1. Resolves `projectDir` and its git dir.
 2. Reads the prompt; an empty prompt is refused.
-3. Finds windows from `~/.ccvi/agent_state/*.json`: a record is a **live window** only when
-   `version` is 1 and it was updated less than 60 s ago, and it matches when its `cwd` is the
-   project. Stale records are history, never windows.
+3. Finds windows by asking CCVI itself: it calls `GET /whoami` on every loopback port in
+   17390-17453 in parallel, and a **live window** is one whose sidecar answers there, matched on
+   its `gitDir` (so worktrees never collide). No file decides whether a window is open; a gone
+   window cannot answer, whatever its leftover records say. `~/.ccvi/agent_state/*.json` only
+   supplies the state (idle / mid-turn / human-driven). For a CCVI build older than `/whoami`
+   (its port answers 404), a record counts only if it is under 60 s old AND its pid is running.
 4. Picks the IDE: a live window's own IDE wins (nothing is launched); else an **Android
    project** (`local.properties` with `sdk.dir=`, `app/src/main/AndroidManifest.xml`, or a
    Gradle file applying `com.android.*`) gets **Android Studio**; else `idePreferred`.
@@ -190,7 +193,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.33 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.34 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE]  - write the next drop; open the IDE if no live window
 • show [projectDir]                            - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                           - move waiting drops to the Trash

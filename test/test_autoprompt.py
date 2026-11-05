@@ -19,6 +19,8 @@ import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
+import http.server
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -30,6 +32,41 @@ NUMBERED = json.dumps({
     "vscode": {"single": None, "numbered": None},
     "cursor": {"single": None, "numbered": None},
 })
+
+# A stand-in for CCVI's GET /whoami (ccvi-idea doc/contracts/aio.md). The script sweeps only
+# the port AUTOPROMPT_PORTS names, so a test run never probes the developer's real windows.
+# FAKE['ids'] is the list of live windows it reports; FAKE['legacy'] makes it 404, like a CCVI
+# build older than the endpoint.
+FAKE = {"ids": [], "legacy": False}
+
+
+class _Whoami(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if FAKE["legacy"] or not FAKE["ids"]:
+            self.send_response(404 if FAKE["legacy"] else 503)
+            self.end_headers()
+            return
+        body = json.dumps(FAKE["ids"][0]).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+def ident(cwd, editor="idea", session="s1", idle=True):
+    git_dir = subprocess.run(["git", "-C", cwd, "rev-parse", "--absolute-git-dir"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    return {"v": 1, "product": "ccvi", "workspaceRoot": cwd, "gitDir": os.path.realpath(git_dir),
+            "editorId": editor, "pid": 99999, "sessionId": session, "idle": idle,
+            "version": "0.0.0"}
+
+
+_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Whoami)
+threading.Thread(target=_server.serve_forever, daemon=True).start()
+FAKE_PORT = _server.server_address[1]
 
 _failures = []
 _count = 0
@@ -45,6 +82,7 @@ def check(name, cond, detail=""):
 def run(home, args, stdin="", env_extra=None, cwd=None):
     env = dict(os.environ, HOME=home, AUTOPROMPT_NO_LAUNCH="1")
     env.pop("AUTOPROMPT_FLOORS_JSON", None)
+    env["AUTOPROMPT_PORTS"] = str(FAKE_PORT)
     if env_extra:
         env.update(env_extra)
     r = subprocess.run([sys.executable, SCRIPT] + args, input=stdin, capture_output=True,
@@ -91,11 +129,12 @@ def install_as(home, version="0.4.168", product="AndroidStudio2026.1.4"):
     open(os.path.join(lib, "ccvi-idea-%s.jar" % version), "w").close()
 
 
-def agent_state(home, name, cwd, repo_root, editor="idea", age_ms=0, version=1, state="idle"):
+def agent_state(home, name, cwd, repo_root, editor="idea", age_ms=0, version=1, state="idle",
+                pid=1):
     d = os.path.join(home, ".ccvi", "agent_state")
     os.makedirs(d, exist_ok=True)
     rec = {"version": version, "sessionId": name, "state": state, "isIdle": True, "cwd": cwd,
-           "repoRoot": repo_root, "editorId": editor, "pid": 1,
+           "repoRoot": repo_root, "editorId": editor, "pid": pid,
            "updatedAtMs": int(time.time() * 1000) - age_ms}
     with open(os.path.join(d, name + ".json"), "w") as f:
         json.dump(rec, f)
@@ -169,11 +208,32 @@ def main():
         rc, out = run(home, ["show", idea_only])
         check("android/.idea only is not android",
               "send would use: IntelliJ IDEA (preference)" in out, out)
-        agent_state(home, "live", plain, plain, editor="as")
+        FAKE["ids"] = [ident(plain, editor="as")]
         rc, out = run(home, ["show", plain])
         check("choose/live window wins", "send would use: Android Studio (live window)" in out,
               out)
-        os.remove(os.path.join(home, ".ccvi", "agent_state", "live.json"))
+        FAKE["ids"] = []
+        # The MicBoom regression: a FRESH record for a window that is gone. No port answers, so
+        # it is history, not a window, however recent its timestamp.
+        agent_state(home, "ghost", plain, plain, editor="as")
+        rc, out = run(home, ["show", plain])
+        check("choose/fresh record but no live port is not a window",
+              "send would use: IntelliJ IDEA (preference)" in out and "live window: none" in out,
+              out)
+        os.remove(os.path.join(home, ".ccvi", "agent_state", "ghost.json"))
+        # A build older than /whoami: its port 404s, and only then is a fresh record trusted,
+        # and only while its pid runs.
+        FAKE["legacy"] = True
+        agent_state(home, "old", plain, plain, editor="as", pid=os.getpid())
+        rc, out = run(home, ["show", plain])
+        check("choose/legacy build falls back to a live-pid record",
+              "send would use: Android Studio (live window)" in out, out)
+        agent_state(home, "old", plain, plain, editor="as", pid=2 ** 22 + 7)
+        rc, out = run(home, ["show", plain])
+        check("choose/legacy record with a dead pid is not a window",
+              "send would use: IntelliJ IDEA (preference)" in out, out)
+        FAKE["legacy"] = False
+        os.remove(os.path.join(home, ".ccvi", "agent_state", "old.json"))
         agent_state(home, "stale", plain, plain, editor="as", age_ms=120_000)
         rc, out = run(home, ["show", plain])
         check("choose/stale ignored", "send would use: IntelliJ IDEA (preference)" in out
@@ -183,12 +243,12 @@ def main():
         check("choose/version 2 skipped", "send would use: IntelliJ IDEA (preference)" in out,
               out)
         shutil.rmtree(os.path.join(home, ".ccvi", "agent_state"))
-        agent_state(home, "sib", wt, plain, editor="idea")
+        FAKE["ids"] = [ident(wt, editor="idea")]
         rc, out = run(home, ["send", "plain", "--no-ide", "--prompt-stdin"], stdin="hi")
         check("send/sibling worktree note", rc == 0 and "other worktrees of this repo are open"
               in out and wt in out, out)
         run(home, ["clear", "plain"])
-        shutil.rmtree(os.path.join(home, ".ccvi", "agent_state"))
+        FAKE["ids"] = []
 
         # ---- capability
         rc, out = run(home, ["show", plain])

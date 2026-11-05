@@ -34,6 +34,9 @@ import re
 import secrets
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 import sys
 import time
 from datetime import datetime
@@ -277,19 +280,113 @@ def rp(p):
     return os.path.realpath(p) if p else None
 
 
+# A window is OPEN only if its sidecar answers GET /whoami on a loopback port right now.
+# ccvi-idea doc/contracts/aio.md, "Window identity". Every CCVI window binds the first free port
+# in 17390..17453 (DEFAULT_REMOTE_PORT + PORT_SCAN_SPAN in remote_ws_server.ts), so one parallel
+# sweep of that range is the full set of live windows. No file is trusted for existence: the
+# MicBoom miss on 2026-11-05 was a closed window whose agent_state record a dying sidecar had
+# just rewritten as a fresh 'idle', which a freshness test cannot tell from a live one.
+# HAND-MIRRORED: ~/.ccvi/aio/hash_cmds/lib/agent_slots.py sweeps the same way; change both.
+PORT_FIRST = 17390
+PORT_SPAN = 64
+PROBE_TIMEOUT_S = 0.4
+
+
+def probe_ports():
+    """The ports to sweep. AUTOPROMPT_PORTS overrides it for tests: 'none', or comma-separated
+    ports and FIRST-LAST ranges."""
+    spec = os.environ.get("AUTOPROMPT_PORTS")
+    if spec is None:
+        return list(range(PORT_FIRST, PORT_FIRST + PORT_SPAN))
+    out = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part or part == "none":
+            continue
+        if "-" in part:
+            a, b = part.split("-", 1)
+            out.extend(range(int(a), int(b) + 1))
+        else:
+            out.append(int(part))
+    return out
+
+
+def whoami(port):
+    """-> ("ccvi", identity) | ("legacy", None) for a server with no /whoami | (None, None)."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/whoami" % port,
+                                    timeout=PROBE_TIMEOUT_S) as r:
+            body = json.loads(r.read().decode("utf-8"))
+        if isinstance(body, dict) and body.get("product") == "ccvi" and body.get("v") == 1:
+            return "ccvi", body
+        return None, None
+    except urllib.error.HTTPError as e:
+        # A server is listening in CCVI's range but has no /whoami: a CCVI build older than the
+        # endpoint. Only then is the agent_state fallback allowed (see live_windows).
+        return ("legacy", None) if e.code == 404 else (None, None)
+    except (OSError, ValueError):
+        return None, None
+
+
+def sweep():
+    """-> (identities, any_legacy)."""
+    ports = probe_ports()
+    if not ports:
+        return [], False
+    with ThreadPoolExecutor(max_workers=min(64, len(ports))) as ex:
+        results = list(ex.map(whoami, ports))
+    ids = [ident for kind, ident in results if kind == "ccvi"]
+    return ids, any(kind == "legacy" for kind, _ in results)
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def window_record(ident, records_by_session):
+    """A proven-live window, in the record shape the rest of this script reads. agent_state
+    contributes the STATE only (idle / mid-turn / human-driven), never the existence."""
+    rec = records_by_session.get(ident.get("sessionId")) or {}
+    state = rec.get("state") or ("idle" if ident.get("idle") else "mid-turn")
+    return {"editorId": ident.get("editorId", "unknown"), "cwd": ident.get("workspaceRoot"),
+            "gitDir": ident.get("gitDir"), "pid": ident.get("pid"),
+            "sessionId": ident.get("sessionId"), "state": state,
+            "updatedAtMs": rec.get("updatedAtMs", now_ms())}
+
+
 def live_windows(project_dir):
-    """-> (exact, siblings, stale) lists of agent_state records."""
+    """-> (exact, siblings, stale). exact and siblings are windows PROVEN live by a /whoami
+    answer; stale is agent_state history for this project that no live window owns."""
     root = repo_root(project_dir)
-    exact, siblings, stale = [], [], []
-    for rec in agent_state_records():
-        cwd = rp(rec.get("cwd"))
-        if is_fresh(rec):
-            if cwd == project_dir:
-                exact.append(rec)
-            elif rp(rec.get("repoRoot")) == root:
-                siblings.append(rec)
-        elif cwd == project_dir:
-            stale.append(rec)
+    target_git = rp(git(["-C", project_dir, "rev-parse", "--absolute-git-dir"]))
+    records = agent_state_records()
+    by_session = {r.get("sessionId"): r for r in records if r.get("sessionId")}
+    ids, any_legacy = sweep()
+    windows = [window_record(i, by_session) for i in ids]
+    live_pids = {w["pid"] for w in windows}
+    if any_legacy:
+        # Fallback for builds older than /whoami ONLY: a fresh record whose process is running.
+        for r in records:
+            if r.get("pid") not in live_pids and is_fresh(r) and pid_alive(r.get("pid")):
+                windows.append(dict(r, gitDir=None))
+                live_pids.add(r.get("pid"))
+    exact, siblings = [], []
+    for w in windows:
+        cwd = rp(w.get("cwd"))
+        same = (rp(w["gitDir"]) == target_git) if w.get("gitDir") else (cwd == project_dir)
+        if same:
+            exact.append(w)
+        elif cwd and repo_root(cwd) == root:
+            siblings.append(w)
+    owned = {w.get("sessionId") for w in exact}
+    stale = [r for r in records if rp(r.get("cwd")) == project_dir
+             and r.get("sessionId") not in owned]
     key = lambda r: -int(r.get("updatedAtMs", 0))
     return sorted(exact, key=key), sorted(siblings, key=key), sorted(stale, key=key)
 
