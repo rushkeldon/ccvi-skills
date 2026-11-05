@@ -33,6 +33,28 @@ Humans and agents both use this skill, and it always runs inside some agent's se
 The consumer contract is ccvi-idea's `doc/contracts/auto_prompt.md`; window liveness comes from
 its `doc/contracts/agent_state.md`.
 
+**A prompt may carry a frontmatter envelope.** The drop is the `.prompt.md` file type (ccvi-idea
+`doc/contracts/prompt_file.md`): a prompt that STARTS with a `---` fence carries host-only
+directives the target window executes before sending the body - `session: new` (start a fresh
+session first), `modes:`, `model:`, `effort:`, `thoughts:`, `yolo:`, `label:`, `title:`. Pass
+the whole thing, fence included, as the prompt:
+
+```text
+/autoprompt send <worktree> '---
+session: new
+modes: agent-loop 80
+yolo: true
+label: "#tickets W-1234"
+---
+<the work order - the only part the target agent sees>'
+```
+
+Only the body reaches the target agent, so the body must say why the turn arrived. `yolo: true`
+is honored only in a worktree the user listed in the target's `ccvi.autoPrompt.yoloSlots`
+setting; elsewhere the body runs without it and the window posts a denial notice. An envelope
+needs CCVI 0.4.187 or newer in the target IDE: below that, `send` refuses rather than letting
+the frontmatter arrive as plain text.
+
 ## Invocation
 
 Single entry point - **`/autoprompt [verb] [args]`**, dispatching on the first arg:
@@ -128,9 +150,12 @@ relay the `refused:` line and stop - do not retry with different arguments unask
    Gradle file applying `com.android.*`) gets **Android Studio**; else `idePreferred`.
 5. Checks that IDE's installed CCVI can consume drops. Too old, or not installed, is a refusal
    before anything is written.
-6. Writes the drop: `auto_prompt.md` when nothing is waiting; `auto_prompt_<N>.md` (next
+6. Writes the drop: `auto.prompt.md` when nothing is waiting; `auto_<N>.prompt.md` (next
    number) when something is and the consumer supports numbered drops; otherwise a refusal.
-   Writes are no-replace, so two senders never overwrite each other.
+   A target older than the directives floor (0.4.187) gets the legacy names (`auto_prompt.md`,
+   `auto_prompt_<N>.md`), which is all it reads, and an envelope prompt to it is refused.
+   Drops already waiting under either spelling count toward the next number. Writes are
+   no-replace, so two senders never overwrite each other.
 7. Launches the IDE with `open -a "<App>" "<projectDir>"` when no live window is open and
    `shouldStartIDE` is true. The drop is written first and waits, so there is no race.
 
@@ -166,7 +191,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.31 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.32 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE]  - write the next drop; open the IDE if no live window
 • show [projectDir]                            - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                           - move waiting drops to the Trash

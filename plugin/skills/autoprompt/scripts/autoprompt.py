@@ -41,6 +41,13 @@ from pathlib import Path
 
 # editorId -> minimum installed CCVI version for each capability, or None = unsupported.
 # "single": consumes <gitDir>/ccvi/auto_prompt.md. "numbered": also drains auto_prompt_<N>.md.
+# "directives": reads the `.prompt.md` spelling (auto.prompt.md, auto_<N>.prompt.md) AND
+#   executes a frontmatter directive envelope (ccvi-idea doc/contracts/prompt_file.md).
+#
+# - ccvi-idea 0.4.187 is the first build with both (prompt_file_type_frontmatter_directives
+#   plan, 2026-11-04). Below it the consumer would send a frontmatter block to the model as
+#   plain text, and would never see a new-spelling name at all, so a directive drop to an
+#   older install is REFUSED and a plain drop keeps the legacy name.
 #
 # Probed 2026-11-01 (gate-consumers), re-probed 2026-11-02:
 # - ccvi-idea 0.4.168 is the first build reading <gitDir>/ccvi/ (0.4.167 read <repoRoot>/).
@@ -53,10 +60,10 @@ from pathlib import Path
 #   ~/.vscode/extensions/appcloud9.ccvi-vscode-{1.2.32,1.2.33} and
 #   ~/.cursor/extensions/appcloud9.ccvi-vscode-{1.2.3,1.2.31}: zero matches. Unsupported.
 FLOORS = {
-    "as":     {"single": "0.4.168", "numbered": "0.4.169"},
-    "idea":   {"single": "0.4.168", "numbered": "0.4.169"},
-    "vscode": {"single": None,      "numbered": None},
-    "cursor": {"single": None,      "numbered": None},
+    "as":     {"single": "0.4.168", "numbered": "0.4.169", "directives": "0.4.187"},
+    "idea":   {"single": "0.4.168", "numbered": "0.4.169", "directives": "0.4.187"},
+    "vscode": {"single": None,      "numbered": None,      "directives": None},
+    "cursor": {"single": None,      "numbered": None,      "directives": None},
 }
 
 APP = {
@@ -70,9 +77,16 @@ CONFIG_KEYS = ("workingDir", "idePreferred")
 IDE_PREFERRED_VALUES = ("idea", "vscode", "cursor")
 IDE_PREFERRED_DEFAULT = "idea"
 
-# The consumer's slot regex, verbatim from the contract. The `\.md$` anchor keeps the
-# consumer's in-flight `*.md.claimed-<pid>` names out.
-SLOT_RE = re.compile(r"^auto_prompt(?:_([1-9][0-9]*))?\.md$")
+# The consumer's slot regexes, verbatim from the contract: the `.prompt.md` spelling, and the
+# legacy spelling it still reads during the dual-spelling window. The `\.md$` anchors keep the
+# consumer's in-flight `*.md.claimed-<pid>` names out. Both count when finding the next free
+# slot, because the consumer interleaves them by slot number.
+SLOT_RE = re.compile(r"^auto(?:_([1-9][0-9]*))?\.prompt\.md$")
+LEGACY_SLOT_RE = re.compile(r"^auto_prompt(?:_([1-9][0-9]*))?\.md$")
+
+# A leading frontmatter fence: the prompt carries a directive envelope. Detection only - the
+# consumer parses it; this script needs no YAML dependency to know an envelope is present.
+ENVELOPE_RE = re.compile(r"^\ufeff?---[ \t]*\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)")
 SLOT_ATTEMPTS = 10
 
 # agent_state heartbeat is ~15 s; the contract's dispatch rule is "fresh = < 60 s".
@@ -434,11 +448,17 @@ def floors():
     return FLOORS
 
 
+def has_envelope(text):
+    return bool(ENVELOPE_RE.match(text))
+
+
 def capability(editor_id):
-    """-> ("numbered" | "single" | "none", installedVersion)."""
+    """-> ("directives" | "numbered" | "single" | "none", installedVersion)."""
     ver = installed_version(editor_id)
     f = floors().get(editor_id, {})
     if ver:
+        if f.get("directives") and vtuple(ver) >= vtuple(f["directives"]):
+            return "directives", ver
         if f.get("numbered") and vtuple(ver) >= vtuple(f["numbered"]):
             return "numbered", ver
         if f.get("single") and vtuple(ver) >= vtuple(f["single"]):
@@ -472,10 +492,17 @@ def slots(ccvi_dir):
         return []
     out = []
     for n in names:
-        m = SLOT_RE.match(n)
+        m = SLOT_RE.match(n) or LEGACY_SLOT_RE.match(n)
         if m:
             out.append((int(m.group(1) or 0), n))
     return sorted(out)
+
+
+def slot_name(n, cap):
+    """The filename for slot n: the new spelling only where the consumer reads it."""
+    if cap == "directives":
+        return "auto.prompt.md" if n == 0 else "auto_%d.prompt.md" % n
+    return "auto_prompt.md" if n == 0 else "auto_prompt_%d.md" % n
 
 
 def write_drop(git_dir, text, cap):
@@ -483,15 +510,15 @@ def write_drop(git_dir, text, cap):
     # Mandatory: a repo that has never had a CCVI window has no ccvi/ dir, and the consumer's
     # claim rename would ENOENT.
     ccvi_dir.mkdir(parents=True, exist_ok=True)
-    tmp = ccvi_dir / (".auto_prompt.%d.%s.tmp" % (os.getpid(), secrets.token_hex(4)))
+    tmp = ccvi_dir / (".auto.%d.%s.tmp" % (os.getpid(), secrets.token_hex(4)))
     tmp.write_text(text.rstrip() + "\n", encoding="utf-8")
     try:
         for _ in range(SLOT_ATTEMPTS):
             present = slots(ccvi_dir)
             if not present:
-                dest = ccvi_dir / "auto_prompt.md"
-            elif cap == "numbered":
-                dest = ccvi_dir / ("auto_prompt_%d.md" % (present[-1][0] + 1))
+                dest = ccvi_dir / slot_name(0, cap)
+            elif cap in ("numbered", "directives"):
+                dest = ccvi_dir / slot_name(present[-1][0] + 1, cap)
             else:
                 raise Refusal("a drop is already waiting at %s; this CCVI version holds one at "
                               "a time" % (ccvi_dir / present[0][1]))
@@ -537,6 +564,15 @@ def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text):
         else:
             fix = "update CCVI in %s, or /autoprompt config idePreferred idea" % app
         raise Refusal("%s; %s" % (found, fix))
+    if has_envelope(text) and cap != "directives":
+        # Below the floor the consumer would send the frontmatter to the model as plain text and
+        # run none of it - the worst kind of partial success. Refuse, naming both versions.
+        app = APP.get(editor_id, editor_id)
+        floor = floors().get(editor_id, {}).get("directives")
+        need = ("needs %s or newer" % floor) if floor else "no version of it supports them"
+        raise Refusal("CCVI for %s at %s can't execute prompt-file directives (%s); update CCVI "
+                      "in %s, or send the prompt without its frontmatter block"
+                      % (app, ver or "not installed", need, app))
     dest = write_drop(git_dir, text, cap)
     present = slots(dest.parent)
     slot_no = next((i for i, n in present if n == dest.name), 0)

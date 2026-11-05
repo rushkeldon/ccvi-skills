@@ -264,6 +264,40 @@ def main():
         check("writer/no prompt lost", bodies == ["p%02d" % i for i in range(20)], bodies)
         check("writer/no temp left", not any(n.startswith(".") for n in names), names)
 
+        # ---- directives floor (2026-11-04): the `.prompt.md` spelling and the envelope
+        run(home, ["clear", plain])
+        envelope = "---\nsession: new\nmodes: agent-loop 80\n---\nthe work order"
+        rc, out = run(home, ["send", plain, "--no-ide", "--prompt-stdin"], stdin=envelope,
+                      env_extra=env)
+        check("directives/below floor refuses an envelope", rc == 1 and "0.4.168" in out
+              and "directives" in out and listing(d) == [], out)
+        rc, out = run(home, ["send", plain, "--no-ide", "--prompt-stdin"],
+                      stdin="\ufeff" + envelope, env_extra=env)
+        check("directives/a BOM does not hide the envelope", rc == 1 and listing(d) == [], out)
+        rc, out = run(home, ["send", plain, "--no-ide", "--prompt-stdin"], stdin="plain",
+                      env_extra=env)
+        check("directives/below floor keeps the legacy name", rc == 0
+              and listing(d) == ["auto_prompt.md"], listing(d))
+        run(home, ["clear", plain])
+        dhome = os.path.join(tmp, "dirhome")
+        install_idea(dhome, version="0.4.187")
+        rc, out = run(dhome, ["send", plain, "--no-ide", "--prompt-stdin"], stdin=envelope)
+        check("directives/at floor writes the new spelling", rc == 0
+              and listing(d) == ["auto.prompt.md"], out)
+        check("directives/envelope written verbatim",
+              open(os.path.join(d, "auto.prompt.md")).read() == envelope + "\n")
+        rc, out = run(dhome, ["send", plain, "--no-ide", "--prompt-stdin"], stdin="next")
+        check("directives/next slot is auto_1.prompt.md", rc == 0
+              and "auto_1.prompt.md" in listing(d), listing(d))
+        run(home, ["clear", plain])
+        with open(os.path.join(d, "auto_prompt_3.md"), "w") as f:
+            f.write("legacy waiting")
+        rc, out = run(dhome, ["send", plain, "--no-ide", "--prompt-stdin"], stdin="after legacy")
+        check("directives/a legacy drop counts toward the next slot", rc == 0
+              and "auto_4.prompt.md" in listing(d), listing(d))
+        rc, out = run(dhome, ["clear", plain])
+        check("directives/clear takes both spellings", rc == 0 and listing(d) == [], listing(d))
+
         # ---- show writes nothing
         before = listing(d)
         run(home, ["show", plain])

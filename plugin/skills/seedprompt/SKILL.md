@@ -1,6 +1,6 @@
 ---
 name: seedprompt
-description: write•read•show•clear - author, consume, inspect, or clear a one-use AI-to-AI session hand-off ("seed prompt") at <memoryRoot>/seedprompt.md - the reliable authoring path to the one well-known file the CCVI sidecar auto-injects and deletes. Use when the user asks to write a seed prompt / hand-off for the next session (or after a /compact), to read/consume the pending one into this session, or to show or clear it.
+description: write•read•show•clear - author, consume, inspect, or clear a one-use AI-to-AI session hand-off ("seed prompt") at <memoryRoot>/seed.prompt.md - the reliable authoring path to the one well-known file the CCVI sidecar auto-injects and deletes. Use when the user asks to write a seed prompt / hand-off for the next session (or after a /compact), to read/consume the pending one into this session, or to show or clear it.
 argument-hint: "[verb]"
 allowed-tools: Read, Write, Bash(printenv:*), Bash(rm:*)
 ---
@@ -30,7 +30,7 @@ Single entry point — **`/seedprompt [verb] [args]`**, dispatching on the first
 
 | Form | Effect |
 |---|---|
-| `/seedprompt write [body]` | Author the pending seed at `<memoryRoot>/seedprompt.md` (overwrites any existing one) |
+| `/seedprompt write [body]` | Author the pending seed at `<memoryRoot>/seed.prompt.md` (overwrites any existing one) |
 | `/seedprompt read` | Consume the pending seed: print its path + contents, adopt the body as this session's hand-off brief, then delete it (one-use); or `none pending` |
 | `/seedprompt show` | Print the pending seed's absolute path + contents, or `none pending` |
 | `/seedprompt clear` | Delete the pending seed (best-effort; `none pending` if absent) |
@@ -47,7 +47,11 @@ The seed is **always** written to **`<memoryRoot>/<seedFile>`** — a **project-
 - `<memoryRoot>` is the **auto-memory directory named in the system prompt** (the parent of the
   per-session `<session_id>/` dirs — the *same* anchor the `modes` skill uses for `active_modes.md`).
   Resolve it once from context; do not guess.
-- `<seedFile>` is normally **`seedprompt.md`**, but is **folder-scoped** in the one case below.
+- `<seedFile>` is normally **`seed.prompt.md`**, but is **folder-scoped** in the one case below.
+  (Renamed 2026-11-04 from `seedprompt.md` to the `.prompt.md` file type. **Write only the new
+  name.** `read`, `show`, and `clear` look for the new name first, then the legacy
+  `seedprompt.md` / `seedprompt.<encode(cwd)>.md`, which the host still consumes until
+  2026-12-04.)
 - The seed sits **beside `MEMORY.md`**, directly in `<memoryRoot>/`.
 
 **`<seedFile>` — scope it when `<memoryRoot>` is not this folder's own.** Claude Code keys the
@@ -61,8 +65,8 @@ context, with **no tool call**:
 1. Encode the absolute cwd: every non-alphanumeric character becomes `-`.
 2. Read the project slug out of `<memoryRoot>` itself — the path component between
    `projects/` and `/memory`.
-3. **They match** → `<seedFile>` is `seedprompt.md`. **They differ** → `<seedFile>` is
-   **`seedprompt.<encode(cwd)>.md`**.
+3. **They match** → `<seedFile>` is `seed.prompt.md`. **They differ** → `<seedFile>` is
+   **`seed.<encode(cwd)>.prompt.md`**.
 
 Use the **whole** encoded cwd, never its last segment: two worktrees with the same folder name
 under different parents would collide. The host's sidecar resolves the identical name, so a
@@ -75,7 +79,7 @@ Three "not" cases — these are the exact historical failure modes, state them a
 2. **NOT** inside a `<session_id>/` subdirectory. The seed is project-level, one per project, not
    per-session. (This is where it differs from `modes`, whose `active_modes.md` *is* per-session.)
 3. **NOT** `MEMORY.md` or any other memory file — the filename is exactly `<seedFile>`:
-   `seedprompt.md`, or the folder-scoped `seedprompt.<encode(cwd)>.md` per the rule above.
+   `seed.prompt.md`, or the folder-scoped `seed.<encode(cwd)>.prompt.md` per the rule above.
    Never invent a different stem, and never scope it when the two slugs match.
 
 **Fallback** (only if the auto-memory dir isn't derivable from the system prompt): compute
@@ -83,7 +87,7 @@ Three "not" cases — these are the exact historical failure modes, state them a
 non-alphanumeric character** of an absolute path with `-` (the same encoding Claude Code uses for
 project dirs; it matches the CCVI host's `encodeProjectDir`). E.g. cwd
 `/Users/keldon/Desktop/working/ccvi-idea` → `-Users-keldon-Desktop-working-ccvi-idea` →
-`~/.claude/projects/-Users-keldon-Desktop-working-ccvi-idea/memory/seedprompt.md`.
+`~/.claude/projects/-Users-keldon-Desktop-working-ccvi-idea/memory/seed.prompt.md`.
 
 `<repoDir>` is the **repository**, not the cwd, because that is what keys the directory: resolve
 symlinks, then — if `<cwd>/.git` is a **file** (the marker of a worktree) — read its `gitdir:`
@@ -97,7 +101,10 @@ actually check against the window they are in.
 
 ## The seed file format
 
-A seed is **an optional YAML frontmatter directive block, then a markdown body**:
+A seed is the **`.prompt.md` file type**: an optional YAML frontmatter envelope of host-only
+directives, then a markdown body. The envelope is specified once, in ccvi-idea's
+`doc/contracts/prompt_file.md` (the keys, their fixed execution order, and how `session: new`
+behaves on each carrier); this skill writes it, and the CCVI host executes it.
 
 ```markdown
 ---
@@ -113,13 +120,31 @@ title: "<3-6 words naming what the next session will do>"
   nothing (no model call, no turn). Write intent, not a summary of the past: "AVM1 parseInt
   surface", not "continuing the work". A generated title supersedes it later if the session
   drifts, so it is a floor, not a verdict.
-- **Otherwise body-only is the norm.** Beyond `title:`, omit the frontmatter unless a caller
-  explicitly passes an allowlisted directive — a consumer tolerates a missing directive block.
-- **Directives are an allowlist**, enforced by the CCVI consumer: only
-  keys with a **registered handler** are honored; any other key is silently ignored (never
-  arbitrary execution). If the seed is consumed manually instead, directives are inert metadata
-  the next session reads as context. Do **not** invent directives beyond `title:`. Quote every value
-  (`key: "value"`).
+- **Other directives only when asked.** Beyond `title:`, add a directive only when the caller
+  explicitly asks for it. The ones a seed most often carries:
+
+  ```markdown
+  ---
+  title: "Ticket 4512 work order"
+  session: new
+  modes: agent-loop 80
+  ---
+  <the hand-off body>
+  ```
+
+  `session: new` in a **seed** cycles the session only when the init that consumes it RESUMED an
+  old conversation (a cold-opened window), so the work does not land inside the previous work
+  item's session; on a fresh session it is a no-op, and on a `/compact` it is ignored with a
+  notice. `modes:` is `;`-separated `/modes` entries, applied after a `clear`. The other keys are
+  `model`, `model_id`, `context_min`, `effort`, `thoughts`, `yolo`, and `label`.
+- **Directives are an allowlist**, enforced by the CCVI consumer: only registered keys execute,
+  and every other key (or an empty, invalid, or nested value) is **named in a notice** with a
+  near-miss suggestion, never silently ignored and never executed. A problem never eats the
+  body. If the seed is consumed manually instead, directives are inert metadata the next session
+  reads as context. Quote every free-text value (`key: "value"`), and write booleans as bare
+  `true` / `false`.
+- **Only the body reaches the next session.** The frontmatter is executed and discarded, so the
+  body must say everything the reader needs, including why the turn arrived.
 - **The body** is a concise first-person hand-off *to the next instance of yourself*: **what we're
   doing, the current state, the immediate next step, and any load-bearing decisions.** Write it the
   way you'd want to be briefed cold — enough to resume without re-deriving intent.
@@ -127,7 +152,9 @@ title: "<3-6 words naming what the next session will do>"
 ## Handling a directive
 
 1. **Resolve `<memoryRoot>`** per **Path resolution** (auto-memory dir from the system prompt; else
-   the cwd fallback). The target is `<memoryRoot>/seedprompt.md`.
+   the cwd fallback). The target is `<memoryRoot>/<seedFile>` (normally `seed.prompt.md`). For
+   `read`, `show`, and `clear`, "the pending seed" is the new name if it exists, else the legacy
+   `seedprompt.md` (or its scoped form) during the deprecation window.
 2. **Dispatch on the verb:**
    - **`write [body]`** — if `[body]` is given inline, use it verbatim as the body; otherwise
      **compose** the first-person hand-off from the current conversation (the four beats above).
@@ -135,13 +162,13 @@ title: "<3-6 words naming what the next session will do>"
      allowlisted directive. **Overwrite**
      any existing pending seed — a newer hand-off supersedes an unconsumed older one. **Never delete
      on write** (deletion belongs to whoever consumes, at consume time).
-   - **`read`** — if `<memoryRoot>/seedprompt.md` exists: print its absolute path and full
+   - **`read`** — if the pending seed exists: print its absolute path and full
      contents, state that the body is now this session's active hand-off brief (directives are
      inert here — report `title:` as context, execute nothing), then delete the file. Else print
      `none pending`.
-   - **`show`** — if `<memoryRoot>/seedprompt.md` exists, print its absolute path and full contents;
+   - **`show`** — if the pending seed exists, print its absolute path and full contents;
      else print `none pending`.
-   - **`clear`** — delete `<memoryRoot>/seedprompt.md` if present (best-effort); echo what happened,
+   - **`clear`** — delete the pending seed if present (best-effort); echo what happened,
      or `none pending` if it wasn't there.
    - **blank / unrecognized verb** — print the **Help output** (no file access).
 3. **Echo** (see below). The echo is the whole response — no preamble.
@@ -150,7 +177,7 @@ title: "<3-6 words naming what the next session will do>"
 
 - **`write`** →
   ```text
-  seed written → <absolute path to seedprompt.md>
+  seed written → <absolute path to seed.prompt.md>
   the CCVI sidecar will inject it as a turn on the next new session (or after /compact), then delete it (one-use); if it doesn't fire, point the next session at this file.
   ```
 - **`read`** → the absolute path on its own line, a fenced block of the contents, then the line
@@ -163,13 +190,13 @@ title: "<3-6 words naming what the next session will do>"
 When the verb is blank or unrecognized, reply with exactly this — no preamble, no postscript:
 
 ```text
-/seedprompt · v0.0.31 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
-• write [body] — write the pending seed to <memoryRoot>/seedprompt.md (compose from context if no body given)
+/seedprompt · v0.0.32 — author a one-use AI-to-AI session hand-off (the CCVI sidecar injects it as a turn on the next session then deletes it; if it doesn't fire, point the next session at the file):
+• write [body] — write the pending seed to <memoryRoot>/seed.prompt.md (compose from context if no body given)
 • read         — consume the pending seed: print + adopt it, then delete (one-use)
 • show         — print the pending seed's path + contents (or "none pending")
 • clear        — delete the pending seed
 
-The seed is project-level: it lives at <memoryRoot>/seedprompt.md (beside MEMORY.md) — never in doc/, never in a <session_id>/ subdir.
+The seed is project-level: it lives at <memoryRoot>/seed.prompt.md (beside MEMORY.md) — never in doc/, never in a <session_id>/ subdir.
 ```
 
 ## When tools are denied
@@ -181,9 +208,10 @@ settings change (e.g. allow `Write` under the auto-memory directory). The happy 
 ## The mechanism (context — do not re-implement here)
 
 **The consumer is the CCVI sidecar**
-(`sidecar/src/seedprompt.ts`): it reads `<memoryRoot>/seedprompt.md` on session init /
-compact-boundary, **deletes** it, runs any registered allowlisted directives, and injects the body
-as a host-authored turn. This skill is *only* the writer/reader — it must land the file at exactly
+(`sidecar/src/seedprompt.ts`): it reads `<memoryRoot>/seed.prompt.md` (then the legacy name) on
+session init / compact-boundary, moves it to the Trash, runs the registered directives through the
+shared `.prompt.md` pipeline (`sidecar/src/prompt_file.ts`), and injects the body as a
+host-authored turn. This skill is *only* the writer/reader — it must land the file at exactly
 the well-known path so any consumer (automated or manual) finds it. There is no other reliable
 writer (the old relay authoring path was removed with the teleprompt engine), so this skill is the
 sole hand-off authoring surface.
