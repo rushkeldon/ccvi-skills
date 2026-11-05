@@ -8,7 +8,8 @@ as its next turn. The consumer side is ccvi-idea's (doc/contracts/auto_prompt.md
 script is a writer only.
 
 Contract:
-  autoprompt.py send   <projectDir> [--no-ide] (--prompt-arg-stdin | --prompt-stdin)
+  autoprompt.py send   <projectDir> [--no-ide] [--ide as|idea|vscode|cursor]
+                       (--prompt-arg-stdin | --prompt-stdin)
   autoprompt.py show   [<projectDir>]
   autoprompt.py clear  <projectDir>
   autoprompt.py config [<key> [<value>]]
@@ -20,14 +21,41 @@ Contract:
   exit    = 0 success; 1 refusal (stdout line starts "refused:"); 2 usage error.
 
 Env (tests and the live smoke):
-  AUTOPROMPT_NO_LAUNCH=1      print the `open -a` command instead of running it
+  AUTOPROMPT_NO_LAUNCH=1      print the `open -a` command instead of running it (the launch
+                              guards still run first; nothing is recorded as launched)
   AUTOPROMPT_FLOORS_JSON=...  replace FLOORS wholesale (JSON of the same shape)
+  AUTOPROMPT_PORTS=...        the /whoami ports to sweep: 'none', or ports and FIRST-LAST ranges
+  AUTOPROMPT_RECENT_PROJECTS_GLOBS=...
+                              os.pathsep-separated globs replacing BOTH JetBrains products'
+                              recentProjects.xml globs (the newest match by mtime is read)
+  AUTOPROMPT_RUNNING_APPS=... comma-separated app names ("IntelliJ IDEA") treated as running;
+                              when set, even empty, `ps` is not called
+
+Launch is idempotent (launch_ide). Two guards run before `open -a`, and either one hitting
+skips the launch: a launch of the same project under LAUNCH_MEMORY_S ago
+(~/.ccvi/autoprompt_launches.json), and, for IntelliJ IDEA and Android Studio only, the IDE
+process running AND its newest recentProjects.xml marking the project opened="true".
+
+Spike, 2026-11-05, IntelliJ IDEA 2026.2: three `open -a "IntelliJ IDEA" <project>` calls on a
+throwaway git project, two of them within 1.5 s while it was loading and a third once it had
+settled, left exactly one project window, and the IDE's pid never changed. No restart or reopen
+reproduced on IntelliJ. Android Studio and VS Code were not probed, so both guards are built
+anyway. Two facts from the same spike shape them:
+- `pgrep -f "/IntelliJ IDEA.app/Contents/MacOS/"` exited 1 while IntelliJ's main process
+  (`/Applications/IntelliJ IDEA.app/Contents/MacOS/idea`) was running, though it did list
+  Android Studio's. `ps -axo comm=` lists both, so "app running" is read from ps
+  (app_running), never pgrep.
+- recentProjects.xml is written lazily: the probe project never appeared in
+  IntelliJIdea2026.2/options/recentProjects.xml, even after its window closed, while the
+  long-open dpp project read opened="true". So the opened="true" guard cannot see a
+  just-launched project; the launch-memory guard is the one that covers the startup race.
 
 Everything home-relative goes through Path.home(), so a test can fake the whole machine by
 setting HOME.
 """
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -39,6 +67,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import sys
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
@@ -447,10 +476,23 @@ def scan_android_markers(d, depth):
     return any(scan_android_markers(s, depth - 1) for s in subdirs)
 
 
-def choose_ide(project_dir, exact):
-    """-> (editorId, reason)."""
+def choose_ide(project_dir, exact, stale, ide=None):
+    """-> (editorId, reason). The first rung that hits wins: a live window, --ide, the newest
+    agent_state record whose editor can take drops, an Android project, the preference."""
     if exact:
         return exact[0].get("editorId", "unknown"), "live window"
+    if ide:
+        return ide, "--ide"
+    caps = {}
+    for rec in stale:
+        eid = rec.get("editorId")
+        if not eid:
+            continue
+        if eid not in caps:
+            caps[eid] = capability(eid)[0]
+        # An editor that can't take drops is skipped here, not refused: history is a hint.
+        if caps[eid] != "none":
+            return eid, "last used"
     if is_android(project_dir):
         return "as", "android project"
     return ide_preferred(), "preference"
@@ -563,11 +605,129 @@ def capability(editor_id):
     return "none", ver
 
 
+# A launch is remembered this long: the window between `open -a` and CCVI answering /whoami.
+LAUNCH_MEMORY_S = 180
+LAUNCH_PRUNE_MS = 24 * 3600 * 1000
+
+# JetBrains config dirs are versioned side by side (IntelliJIdea2022.3 ... IntelliJIdea2026.2),
+# so only the newest recentProjects.xml by mtime is the running product's.
+RECENT_PROJECTS_GLOBS = {
+    "idea": "Library/Application Support/JetBrains/IntelliJIdea*/options/recentProjects.xml",
+    "as": "Library/Application Support/Google/AndroidStudio*/options/recentProjects.xml",
+}
+
+
+def launches_path():
+    return Path.home() / ".ccvi" / "autoprompt_launches.json"
+
+
+def read_launches():
+    try:
+        data = json.loads(launches_path().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_launch(editor_id, project_dir):
+    now = now_ms()
+    data = {}
+    for k, v in read_launches().items():
+        try:
+            if now - int(v.get("atMs", 0)) < LAUNCH_PRUNE_MS:
+                data[k] = v
+        except (AttributeError, TypeError, ValueError):
+            continue
+    data[project_dir] = {"editorId": editor_id, "atMs": now}
+    p = launches_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(".autoprompt_launches.%d.tmp" % os.getpid())
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, p)
+    except OSError:
+        pass  # the launch happened; losing its memory only weakens the next guard
+
+
+def recent_launch_age_s(project_dir):
+    """-> seconds since this project was launched, if under LAUNCH_MEMORY_S; else None."""
+    rec = read_launches().get(project_dir)
+    try:
+        age_s = (now_ms() - int(rec["atMs"])) / 1000.0
+    except (KeyError, TypeError, ValueError):
+        return None
+    return age_s if 0 <= age_s < LAUNCH_MEMORY_S else None
+
+
+def recent_projects_file(editor_id):
+    override = os.environ.get("AUTOPROMPT_RECENT_PROJECTS_GLOBS")
+    if override is not None:
+        patterns = [g for g in override.split(os.pathsep) if g]
+    elif editor_id in RECENT_PROJECTS_GLOBS:
+        patterns = [str(Path.home() / RECENT_PROJECTS_GLOBS[editor_id])]
+    else:
+        return None
+    files = []
+    for pat in patterns:
+        for f in glob.glob(pat):
+            try:
+                files.append((os.path.getmtime(f), f))
+            except OSError:
+                continue
+    return max(files)[1] if files else None
+
+
+def jetbrains_open(editor_id, project_dir):
+    """True when the newest recentProjects.xml marks project_dir opened="true". Shape, ported
+    from dpp's agent_slots.py open_in_ide (verified 2026-11-02):
+      <entry key="$USER_HOME$/Desktop/working/x"><value><RecentProjectMetaInfo opened="true"/>
+    opened="true" survives a normal quit, so it means "open now" only while the IDE runs."""
+    f = recent_projects_file(editor_id)
+    if not f:
+        return False
+    try:
+        root = ET.parse(f).getroot()
+    except (OSError, ET.ParseError):
+        return False
+    home = str(Path.home())
+    for entry in root.iter("entry"):
+        key = entry.get("key")
+        if not key or os.path.realpath(key.replace("$USER_HOME$", home)) != project_dir:
+            continue
+        if any(m.get("opened") == "true" for m in entry.iter("RecentProjectMetaInfo")):
+            return True
+    return False
+
+
+def app_running(app):
+    override = os.environ.get("AUTOPROMPT_RUNNING_APPS")
+    if override is not None:
+        return app in {a.strip() for a in override.split(",")}
+    try:
+        r = subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True)
+    except OSError:
+        return False
+    # The app's own main executable, not a helper bundle nested inside it.
+    marker = "/%s.app/Contents/MacOS/" % app
+    for line in r.stdout.splitlines():
+        i = line.find(marker)
+        if i >= 0 and "/" not in line[i + len(marker):]:
+            return True
+    return False
+
+
 def launch_ide(editor_id, project_dir):
-    """-> a report fragment."""
+    """-> a report fragment. Idempotent: see the module docstring's launch guards."""
     app = APP.get(editor_id)
     if not app:
         return "no app known for editorId %r - not launched" % editor_id
+    age_s = recent_launch_age_s(project_dir)
+    if age_s is not None:
+        return "launched %ds ago; waiting for CCVI to start - not relaunched" % int(age_s)
+    # The XML first: it is a file read, and a miss spares the ps call.
+    if editor_id in RECENT_PROJECTS_GLOBS and jetbrains_open(editor_id, project_dir) \
+            and app_running(app):
+        return "open in %s but CCVI is not answering; the drop waits - not relaunched" % app
     if os.environ.get("AUTOPROMPT_NO_LAUNCH") == "1":
         return 'would run: open -a "%s" "%s"' % (app, project_dir)
     if sys.platform != "darwin":
@@ -575,6 +735,7 @@ def launch_ide(editor_id, project_dir):
     r = subprocess.run(["open", "-a", app, project_dir], capture_output=True, text=True)
     if r.returncode != 0:
         return "launch failed: %s" % (r.stderr.strip() or "open exited %d" % r.returncode)
+    record_launch(editor_id, project_dir)
     return "launched"
 
 
@@ -643,11 +804,11 @@ def window_line(rec):
     return "%s (state %s)" % (APP.get(eid, eid), state_of(rec))
 
 
-def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text):
+def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text, ide=None):
     project_dir, git_dir = resolve_project(raw_project)
     text = read_prompt(prompt_mode, stdin_text)
-    exact, siblings, _stale = live_windows(project_dir)
-    editor_id, reason = choose_ide(project_dir, exact)
+    exact, siblings, stale = live_windows(project_dir)
+    editor_id, reason = choose_ide(project_dir, exact, stale, ide)
     cap, ver = capability(editor_id)
     if cap == "none":
         app = APP.get(editor_id, editor_id)
@@ -658,7 +819,11 @@ def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text):
                    "CCVI in %s" % app)
         elif reason == "android project":
             fix = "update CCVI in Android Studio"
+        elif reason == "--ide":
+            fix = "update CCVI in %s, or omit --ide" % app
         else:
+            # "preference", and "last used" for safety: rung 3 skips editors that can't take
+            # drops, so a refusal there should be unreachable.
             fix = "update CCVI in %s, or /autoprompt config idePreferred idea" % app
         raise Refusal("%s; %s" % (found, fix))
     if has_envelope(text) and cap != "directives":
@@ -690,6 +855,8 @@ def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text):
             "%s (%s)" % (r.get("cwd"), r.get("editorId", "unknown")) for r in siblings))
     if len(exact) > 1:
         lines.append("note: %d windows share this worktree; either may take the drop" % len(exact))
+    if exact and ide and ide != editor_id:
+        lines.append("note: --ide %s ignored; a live %s window takes the drop" % (ide, app))
     return "\n".join(lines)
 
 
@@ -707,7 +874,7 @@ def cmd_show(raw_project):
         return cmd_config(None, None)
     project_dir, git_dir = resolve_project(raw_project)
     exact, siblings, stale = live_windows(project_dir)
-    editor_id, reason = choose_ide(project_dir, exact)
+    editor_id, reason = choose_ide(project_dir, exact, stale)
     cap, ver = capability(editor_id)
     ccvi_dir = Path(git_dir) / "ccvi"
     lines = ["project: %s" % project_dir, "git dir: %s" % git_dir]
@@ -779,6 +946,7 @@ def main(argv):
     s = sub.add_parser("send")
     s.add_argument("projectDir")
     s.add_argument("--no-ide", action="store_true")
+    s.add_argument("--ide", choices=list(APP))
     g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("--prompt-arg-stdin", action="store_true")
     g.add_argument("--prompt-stdin", action="store_true")
@@ -793,7 +961,7 @@ def main(argv):
     try:
         if a.verb == "send":
             mode = "arg" if a.prompt_arg_stdin else "authored"
-            out = cmd_send(a.projectDir, not a.no_ide, mode, sys.stdin.read())
+            out = cmd_send(a.projectDir, not a.no_ide, mode, sys.stdin.read(), a.ide)
         elif a.verb == "show":
             out = cmd_show(a.projectDir)
         elif a.verb == "clear":

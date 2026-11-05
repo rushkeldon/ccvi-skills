@@ -212,7 +212,8 @@ MANIFEST_SKILLS = [
     "verbs": [
       {"name": "send", "params": [_param("projectDir", True, "dir"),
                                   _param("prompt", False, "freeform"),
-                                  _param("shouldStartIDE", False, "flag", "1")]},
+                                  _param("shouldStartIDE", False, "flag", "1"),
+                                  _param("ide", False, "freeform")]},
       {"name": "show", "params": [_param("projectDir", False, "dir")]},
       {"name": "clear", "params": [_param("projectDir", True, "dir")]},
       {"name": "config", "params": [_param("key", False, "freeform"),

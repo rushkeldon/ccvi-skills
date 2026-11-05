@@ -1,7 +1,7 @@
 ---
 name: autoprompt
-description: send•show•clear•config - hand a prompt to the agent in ANOTHER project by writing a CCVI auto-prompt dead drop into that project's per-worktree git dir and, unless told not to, opening it in the right IDE (Android Studio for Android, else a configured preference) so the CCVI window there runs it as its next turn, via /autoprompt [verb]. Use when the user (or an agent) wants to send work, a brief, or a prompt to another repo's session, or to inspect or clear prompts waiting for one.
-argument-hint: "[verb] {projectDir} [prompt] [shouldStartIDE]"
+description: send•show•clear•config - hand a prompt to the agent in ANOTHER project by writing a CCVI auto-prompt dead drop into that project's per-worktree git dir and, unless told not to, opening it in the right IDE (a named one, else the IDE it last ran in, else Android Studio for Android, else a configured preference) so the CCVI window there runs it as its next turn, via /autoprompt [verb]. Use when the user (or an agent) wants to send work, a brief, or a prompt to another repo's session, or to inspect or clear prompts waiting for one.
+argument-hint: "[verb] {projectDir} [prompt] [shouldStartIDE] [ide]"
 allowed-tools: Read, Bash(python3:*)
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
 # for the model; this block MIRRORS it for a host that renders a verb menu and
@@ -10,7 +10,8 @@ allowed-tools: Read, Bash(python3:*)
 verbs:
   send:   { order: 1, params: [ { name: projectDir,     type: string,  required: true },
                                 { name: prompt,         type: string,  required: false },
-                                { name: shouldStartIDE, type: boolean, required: false, default: true } ] }
+                                { name: shouldStartIDE, type: boolean, required: false, default: true },
+                                { name: ide,            type: string,  required: false } ] }
   show:   { order: 2, params: [ { name: projectDir, type: string, required: false } ] }
   clear:  { order: 3, params: [ { name: projectDir, type: string, required: true } ] }
   config: { order: 4, params: [ { name: key,   type: string, required: false },
@@ -60,7 +61,7 @@ Single entry point - **`/autoprompt [verb] [args]`**, dispatching on the first a
 
 | Form | Effect |
 |---|---|
-| `/autoprompt send {projectDir} [prompt] [shouldStartIDE]` | Write the next drop for `projectDir`; open its IDE if no live window is there |
+| `/autoprompt send {projectDir} [prompt] [shouldStartIDE] [ide]` | Write the next drop for `projectDir`; open its IDE if no live window is there |
 | `/autoprompt show [projectDir]` | Report what `send` would do, plus waiting drops; with no arg, the config. Writes nothing |
 | `/autoprompt clear {projectDir}` | Move the project's waiting drops to the Trash (`~/.Trash`; the XDG trash off macOS) |
 | `/autoprompt config [key] [value]` | Show all config, show one key, or set one |
@@ -85,10 +86,15 @@ off to the dpp agent" -> `send`; "what's waiting for android-dmgz?" -> `show`.
 
 ### Argument parsing for `send`
 
-After `projectDir`, if the **last** token is one of `true false 1 0 yes no` (any case) **and is
-not inside the quoted prompt**, it is `shouldStartIDE`; everything between `projectDir` and it
-(or to the end) is `prompt`, outer quotes stripped. So `'ship it or no'` is all prompt, while an
-unquoted multi-word prompt still works.
+After `projectDir`, look at the **trailing** tokens that are **not inside the quoted prompt**,
+up to two of them, in either order:
+
+- one of `true false 1 0 yes no` (any case) is `shouldStartIDE`;
+- one of `as idea vscode cursor` is `ide`.
+
+Everything between `projectDir` and those (or to the end) is `prompt`, outer quotes stripped. So
+`'ship it or no'` and `'open it in idea'` are all prompt, while an unquoted multi-word prompt
+still works.
 
 | directive | prompt | shouldStartIDE |
 |---|---|---|
@@ -96,8 +102,11 @@ unquoted multi-word prompt still works.
 | `/autoprompt android-dmgz 'my amazing prompt'` | that text | true |
 | `/autoprompt android-dmgz ~/notes/handoff.md false` | that file | false |
 | `/autoprompt android-dmgz false` | agent-authored | false |
+| `/autoprompt dpp 'my amazing prompt' vscode` | that text | true, `ide` vscode |
+| `/autoprompt dpp idea false` | agent-authored | false, `ide` idea |
 
-`shouldStartIDE` defaults to true. False maps to the script's `--no-ide`.
+`shouldStartIDE` defaults to true. False maps to the script's `--no-ide`. `ide` maps to
+`--ide <ide>`; omitted, the script picks (see **What `send` does**, step 4).
 
 ### `prompt`: text, a file, or authored
 
@@ -116,13 +125,13 @@ Substitute `{SKILL_DIR}` with the "Base directory for this skill" path. Always s
 on stdin through a **quoted** heredoc, so the shell never expands it:
 
 ```bash
-python3 "{SKILL_DIR}/scripts/autoprompt.py" send "<projectDir>" [--no-ide] --prompt-arg-stdin <<'AUTOPROMPT_EOF'
+python3 "{SKILL_DIR}/scripts/autoprompt.py" send "<projectDir>" [--no-ide] [--ide <ide>] --prompt-arg-stdin <<'AUTOPROMPT_EOF'
 <the raw prompt argument>
 AUTOPROMPT_EOF
 ```
 
 ```bash
-python3 "{SKILL_DIR}/scripts/autoprompt.py" send "<projectDir>" [--no-ide] --prompt-stdin <<'AUTOPROMPT_EOF'
+python3 "{SKILL_DIR}/scripts/autoprompt.py" send "<projectDir>" [--no-ide] [--ide <ide>] --prompt-stdin <<'AUTOPROMPT_EOF'
 <the brief you authored>
 AUTOPROMPT_EOF
 ```
@@ -151,9 +160,15 @@ relay the `refused:` line and stop - do not retry with different arguments unask
    window cannot answer, whatever its leftover records say. `~/.ccvi/agent_state/*.json` only
    supplies the state (idle / mid-turn / human-driven). For a CCVI build older than `/whoami`
    (its port answers 404), a record counts only if it is under 60 s old AND its pid is running.
-4. Picks the IDE: a live window's own IDE wins (nothing is launched); else an **Android
-   project** (`local.properties` with `sdk.dir=`, `app/src/main/AndroidManifest.xml`, or a
-   Gradle file applying `com.android.*`) gets **Android Studio**; else `idePreferred`.
+4. Picks the IDE, taking the first of five rungs that hits (the report names the rung):
+   1. **live window** - its own IDE wins and nothing is launched. A given `ide` that differs is
+      ignored, with a `note: --ide <x> ignored` line.
+   2. **`--ide`** - the `ide` you named.
+   3. **last used** - the newest `~/.ccvi/agent_state` record for this project whose editor's
+      installed CCVI can take drops. A record for an editor that can't is skipped, not refused.
+   4. **android project** (`local.properties` with `sdk.dir=`, `app/src/main/AndroidManifest.xml`,
+      or a Gradle file applying `com.android.*`) - **Android Studio**.
+   5. **preference** - `idePreferred`.
 5. Checks that IDE's installed CCVI can consume drops. Too old, or not installed, is a refusal
    before anything is written.
 6. Writes the drop: `auto.prompt.md` when nothing is waiting; `auto_<N>.prompt.md` (next
@@ -163,7 +178,11 @@ relay the `refused:` line and stop - do not retry with different arguments unask
    Drops already waiting under either spelling count toward the next number. Writes are
    no-replace, so two senders never overwrite each other.
 7. Launches the IDE with `open -a "<App>" "<projectDir>"` when no live window is open and
-   `shouldStartIDE` is true. The drop is written first and waits, so there is no race.
+   `shouldStartIDE` is true. The drop is written first and waits, so there is no race. The
+   launch is idempotent: it is skipped (`not relaunched`) when this project was launched under
+   180 s ago (`~/.ccvi/autoprompt_launches.json`), or, for IntelliJ IDEA and Android Studio, when
+   the IDE is running and its newest `recentProjects.xml` marks the project open. Either way the
+   drop waits for CCVI to come up.
 
 A busy target (`mid-turn`, or `human-driven` because someone typed in it recently) still gets
 the drop; it queues behind the current turn like a typed prompt, and the report names the
@@ -197,11 +216,12 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.35 - send a prompt to another project's CCVI session:
-• send {projectDir} [prompt] [shouldStartIDE]  - write the next drop; open the IDE if no live window
-• show [projectDir]                            - what send would do + waiting drops (no arg: config)
-• clear {projectDir}                           - move waiting drops to the Trash
-• config [key] [value]                         - workingDir | idePreferred (idea, vscode, cursor)
+/autoprompt · v0.0.36 - send a prompt to another project's CCVI session:
+• send {projectDir} [prompt] [shouldStartIDE] [ide]  - write the next drop; open the IDE if no live window
+• show [projectDir]                                  - what send would do + waiting drops (no arg: config)
+• clear {projectDir}                                 - move waiting drops to the Trash
+• config [key] [value]                               - workingDir | idePreferred (idea, vscode, cursor)
 
 Shorthand: /autoprompt {projectDir} ... is send. prompt: text, or a path to a .md file; omitted, the agent writes it.
+ide: as | idea | vscode | cursor; omitted, the IDE it last ran in, then Android Studio for Android, then idePreferred.
 ```

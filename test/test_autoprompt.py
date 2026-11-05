@@ -3,8 +3,9 @@
 Harness for plugin/skills/autoprompt/scripts/autoprompt.py.
 
 Runs the real script as a subprocess against a throwaway HOME (config, agent_state, the
-Trash, and the IDE install dirs are all fakes) with AUTOPROMPT_NO_LAUNCH=1, over real git
-repos and worktrees built in a temp dir.
+Trash, the IDE install dirs, recentProjects.xml, and the launch memory are all fakes) with
+AUTOPROMPT_NO_LAUNCH=1 and AUTOPROMPT_RUNNING_APPS empty, over real git repos and worktrees
+built in a temp dir. The one real-launch case puts a fake `open` first on PATH.
 
 Run:  python3 test/test_autoprompt.py     (exit 0 = all green; exit 1 = failures)
 
@@ -81,8 +82,11 @@ def check(name, cond, detail=""):
 
 def run(home, args, stdin="", env_extra=None, cwd=None):
     env = dict(os.environ, HOME=home, AUTOPROMPT_NO_LAUNCH="1")
-    env.pop("AUTOPROMPT_FLOORS_JSON", None)
+    for k in ("AUTOPROMPT_FLOORS_JSON", "AUTOPROMPT_RECENT_PROJECTS_GLOBS"):
+        env.pop(k, None)
     env["AUTOPROMPT_PORTS"] = str(FAKE_PORT)
+    # Hermetic by default: no app counts as running, and ps is never called.
+    env["AUTOPROMPT_RUNNING_APPS"] = ""
     if env_extra:
         env.update(env_extra)
     r = subprocess.run([sys.executable, SCRIPT] + args, input=stdin, capture_output=True,
@@ -138,6 +142,32 @@ def agent_state(home, name, cwd, repo_root, editor="idea", age_ms=0, version=1, 
            "updatedAtMs": int(time.time() * 1000) - age_ms}
     with open(os.path.join(d, name + ".json"), "w") as f:
         json.dump(rec, f)
+
+
+def recent_projects(path, entries, mtime=None):
+    """Write a JetBrains recentProjects.xml. entries: [(key, opened)]."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    rows = "".join(
+        '<entry key="%s"><value><RecentProjectMetaInfo frameTitle="x" opened="%s"/></value>'
+        '</entry>' % (k, "true" if o else "false") for k, o in entries)
+    with open(path, "w") as f:
+        f.write('<application><component name="RecentProjectsManager"><option '
+                'name="additionalInfo"><map>%s</map></option></component></application>' % rows)
+    if mtime is not None:
+        os.utime(path, (mtime, mtime))
+
+
+def launches(home, entries):
+    """Seed ~/.ccvi/autoprompt_launches.json. entries: {projectDir: (editorId, age_ms)}."""
+    d = os.path.join(home, ".ccvi")
+    os.makedirs(d, exist_ok=True)
+    now = int(time.time() * 1000)
+    with open(os.path.join(d, "autoprompt_launches.json"), "w") as f:
+        json.dump({k: {"editorId": e, "atMs": now - a} for k, (e, a) in entries.items()}, f)
+
+
+def ide_line(out):
+    return next((l for l in out.splitlines() if l.startswith("ide: ")), "")
 
 
 def ccvi_dir(repo):
@@ -218,7 +248,7 @@ def main():
         agent_state(home, "ghost", plain, plain, editor="as")
         rc, out = run(home, ["show", plain])
         check("choose/fresh record but no live port is not a window",
-              "send would use: IntelliJ IDEA (preference)" in out and "live window: none" in out,
+              "send would use: Android Studio (last used)" in out and "live window: none" in out,
               out)
         os.remove(os.path.join(home, ".ccvi", "agent_state", "ghost.json"))
         # A build older than /whoami: its port 404s, and only then is a fresh record trusted,
@@ -231,13 +261,16 @@ def main():
         agent_state(home, "old", plain, plain, editor="as", pid=2 ** 22 + 7)
         rc, out = run(home, ["show", plain])
         check("choose/legacy record with a dead pid is not a window",
-              "send would use: IntelliJ IDEA (preference)" in out, out)
+              "send would use: Android Studio (last used)" in out and "live window: none" in out,
+              out)
         FAKE["legacy"] = False
         os.remove(os.path.join(home, ".ccvi", "agent_state", "old.json"))
         agent_state(home, "stale", plain, plain, editor="as", age_ms=120_000)
         rc, out = run(home, ["show", plain])
-        check("choose/stale ignored", "send would use: IntelliJ IDEA (preference)" in out
+        check("choose/stale is history, not a window",
+              "send would use: Android Studio (last used)" in out and "live window: none" in out
               and "history: as" in out, out)
+        os.remove(os.path.join(home, ".ccvi", "agent_state", "stale.json"))
         agent_state(home, "v2", plain, plain, editor="as", version=2)
         rc, out = run(home, ["show", plain])
         check("choose/version 2 skipped", "send would use: IntelliJ IDEA (preference)" in out,
@@ -249,6 +282,172 @@ def main():
               in out and wt in out, out)
         run(home, ["clear", "plain"])
         FAKE["ids"] = []
+
+        # ---- choose_ide rungs (2026-11-05): live window, --ide, last used, android, preference
+        lu = make_repo(os.path.join(work, "lastused"))
+        vs_floors = json.loads(NUMBERED)
+        vs_floors["vscode"] = {"single": "1.0.0", "numbered": "1.0.0"}
+        vs_env = {"AUTOPROMPT_FLOORS_JSON": json.dumps(vs_floors)}
+        os.makedirs(os.path.join(home, ".vscode", "extensions", "appcloud9.ccvi-vscode-1.2.33"))
+        agent_state(home, "lu-idea", lu, lu, editor="idea", age_ms=600_000)
+        agent_state(home, "lu-vs", lu, lu, editor="vscode", age_ms=60_000)
+        rc, out = run(home, ["send", lu, "--prompt-stdin"], stdin="hi", env_extra=vs_env)
+        check("rung/last used names the newest record's editor", rc == 0
+              and ide_line(out) == 'ide: Visual Studio Code (last used) - would run: open -a '
+              '"Visual Studio Code" "%s"' % lu, out)
+        run(home, ["clear", lu])
+        rc, out = run(home, ["send", lu, "--ide", "idea", "--prompt-stdin"], stdin="hi",
+                      env_extra=vs_env)
+        check("rung/--ide beats last used", rc == 0
+              and ide_line(out).startswith("ide: IntelliJ IDEA (--ide) - would run"), out)
+        run(home, ["clear", lu])
+        rc, out = run(home, ["show", lu])
+        check("rung/last used skips an editor that can't take drops",
+              "send would use: IntelliJ IDEA (last used)" in out, out)
+        rc, out = run(home, ["send", lu, "--prompt-stdin"], stdin="hi")
+        check("rung/a skipped editor is not a refusal", rc == 0
+              and "(last used)" in ide_line(out), out)
+        run(home, ["clear", lu])
+        rc, out = run(home, ["send", lu, "--ide", "vscode", "--prompt-stdin"], stdin="hi")
+        check("rung/--ide refusal names the --ide remedy", rc == 1
+              and "or omit --ide" in out and listing(ccvi_dir(lu)) == [], out)
+        agent_state(home, "droid-idea", droid_lp, droid_lp, editor="idea")
+        rc, out = run(home, ["show", droid_lp])
+        check("rung/last used beats android project",
+              "send would use: IntelliJ IDEA (last used)" in out, out)
+        rc, out = run(home, ["send", droid_lp, "--ide", "as", "--no-ide", "--prompt-stdin"],
+                      stdin="hi")
+        check("rung/--ide beats android and last used", rc == 0
+              and "ide: Android Studio (--ide) - not launched (--no-ide)" in out, out)
+        run(home, ["clear", droid_lp])
+        FAKE["ids"] = [ident(lu, editor="as")]
+        rc, out = run(home, ["send", lu, "--ide", "idea", "--prompt-stdin"], stdin="hi")
+        check("rung/live window beats --ide", rc == 0
+              and "ide: Android Studio (live window) - already open" in out, out)
+        check("rung/--ide on a live window adds the ignored note",
+              "note: --ide idea ignored; a live Android Studio window takes the drop" in out, out)
+        run(home, ["clear", lu])
+        rc, out = run(home, ["send", lu, "--ide", "as", "--prompt-stdin"], stdin="hi")
+        check("rung/--ide matching the live window adds no note", rc == 0
+              and "ignored" not in out, out)
+        run(home, ["clear", lu])
+        FAKE["ids"] = []
+        rc, out = run(home, ["send", lu, "--ide", "bogus", "--prompt-stdin"], stdin="hi")
+        check("rung/--ide outside the APP table is a usage error", rc == 2, out)
+        shutil.rmtree(os.path.join(home, ".ccvi", "agent_state"))
+        shutil.rmtree(os.path.join(home, ".vscode"))
+
+        # ---- launch guard 1: a launch under 180 s ago is not repeated
+        lg = make_repo(os.path.join(work, "launchguard"))
+        launches(home, {lg: ("idea", 179_000)})
+        rc, out = run(home, ["send", lg, "--prompt-stdin"], stdin="hi")
+        check("launch/179 s ago is not relaunched", rc == 0 and ide_line(out) ==
+              "ide: IntelliJ IDEA (preference) - launched 179s ago; waiting for CCVI to start"
+              " - not relaunched", out)
+        run(home, ["clear", lg])
+        launches(home, {lg: ("idea", 181_000)})
+        rc, out = run(home, ["send", lg, "--prompt-stdin"], stdin="hi")
+        check("launch/181 s ago launches", rc == 0 and "would run: open -a" in out, out)
+        run(home, ["clear", lg])
+        rc, out = run(home, ["send", lg, "--no-ide", "--prompt-stdin"], stdin="hi")
+        check("launch/--no-ide still wins", rc == 0 and "not launched (--no-ide)" in out, out)
+        run(home, ["clear", lg])
+        with open(os.path.join(home, ".ccvi", "autoprompt_launches.json"), "w") as f:
+            f.write("{not json")
+        rc, out = run(home, ["send", lg, "--prompt-stdin"], stdin="hi")
+        check("launch/an unreadable memory file launches", rc == 0 and "would run" in out, out)
+        run(home, ["clear", lg])
+        if sys.platform == "darwin":
+            # The real path: a fake `open` records its argv, and the launch is remembered.
+            fakebin = os.path.join(tmp, "fakebin")
+            os.makedirs(fakebin)
+            open_log = os.path.join(tmp, "open.log")
+            with open(os.path.join(fakebin, "open"), "w") as f:
+                f.write('#!/bin/sh\necho "$@" >> "%s"\n' % open_log)
+            os.chmod(os.path.join(fakebin, "open"), 0o755)
+            launches(home, {"/gone/old": ("idea", 2 * 86_400_000)})
+            real_env = dict(vs_env, AUTOPROMPT_NO_LAUNCH="0",
+                            PATH=fakebin + os.pathsep + os.environ.get("PATH", ""))
+            rc1, out1 = run(home, ["send", lg, "--prompt-stdin"], stdin="one", env_extra=real_env)
+            rc2, out2 = run(home, ["send", lg, "--prompt-stdin"], stdin="two", env_extra=real_env)
+            opens = open(open_log).read().splitlines() if os.path.exists(open_log) else []
+            check("launch/back-to-back sends launch once", rc1 == 0 and rc2 == 0
+                  and opens == ["-a IntelliJ IDEA %s" % lg], (opens, out1, out2))
+            check("launch/the second send reports not relaunched",
+                  ide_line(out1).endswith("- launched")
+                  and ide_line(out2).endswith("not relaunched"), (out1, out2))
+            mem = json.load(open(os.path.join(home, ".ccvi", "autoprompt_launches.json")))
+            check("launch/memory records the launch and prunes day-old entries",
+                  list(mem) == [lg] and mem[lg]["editorId"] == "idea", mem)
+            run(home, ["clear", lg])
+        os.remove(os.path.join(home, ".ccvi", "autoprompt_launches.json"))
+
+        # ---- launch guard 2: open in a running JetBrains IDE (idea, as only)
+        hp_dir = os.path.join(home, "Desktop", "hp")
+        hp = make_repo(hp_dir)
+        jb = os.path.join(home, "Library", "Application Support", "JetBrains")
+        new_xml = os.path.join(jb, "IntelliJIdea2026.2", "options", "recentProjects.xml")
+        old_xml = os.path.join(jb, "IntelliJIdea2025.3", "options", "recentProjects.xml")
+        now_s = time.time()
+        recent_projects(new_xml, [("$USER_HOME$/Desktop/hp", True)], mtime=now_s)
+        running = {"AUTOPROMPT_RUNNING_APPS": "IntelliJ IDEA"}
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi")
+        check("open/opened=true but the app is not running launches", rc == 0
+              and "would run: open -a" in out, out)
+        run(home, ["clear", hp])
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi", env_extra=running)
+        check("open/opened=true and the app running is not relaunched", rc == 0
+              and ide_line(out) == "ide: IntelliJ IDEA (preference) - open in IntelliJ IDEA but "
+              "CCVI is not answering; the drop waits - not relaunched", out)
+        run(home, ["clear", hp])
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi",
+                      env_extra={"AUTOPROMPT_RUNNING_APPS": "Android Studio"})
+        check("open/another app running does not count", rc == 0 and "would run" in out, out)
+        run(home, ["clear", hp])
+        recent_projects(new_xml, [("$USER_HOME$/Desktop/hp", False)], mtime=now_s)
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi", env_extra=running)
+        check("open/opened=false launches", rc == 0 and "would run" in out, out)
+        run(home, ["clear", hp])
+        recent_projects(old_xml, [("$USER_HOME$/Desktop/hp", True)], mtime=now_s - 3600)
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi", env_extra=running)
+        check("open/an older config dir's opened=true is ignored", rc == 0 and "would run" in out,
+              out)
+        run(home, ["clear", hp])
+        os.utime(old_xml, (now_s + 60, now_s + 60))
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi", env_extra=running)
+        check("open/the newest config dir by mtime is the one read", rc == 0
+              and "not relaunched" in out, out)
+        run(home, ["clear", hp])
+        elsewhere = os.path.join(tmp, "elsewhere", "recentProjects.xml")
+        recent_projects(elsewhere, [(hp, True)])
+        vs_ext = os.path.join(home, ".vscode", "extensions", "appcloud9.ccvi-vscode-1.2.33")
+        os.makedirs(vs_ext)
+        rc, out = run(home, ["send", hp, "--ide", "vscode", "--prompt-stdin"], stdin="hi",
+                      env_extra=dict(vs_env, AUTOPROMPT_RUNNING_APPS="Visual Studio Code",
+                                     AUTOPROMPT_RECENT_PROJECTS_GLOBS=elsewhere))
+        check("open/vscode gets launch memory only", rc == 0 and "would run" in out, out)
+        run(home, ["clear", hp])
+        shutil.rmtree(os.path.join(home, ".vscode"))
+        rc, out = run(home, ["send", hp, "--prompt-stdin"], stdin="hi",
+                      env_extra=dict(running, AUTOPROMPT_RECENT_PROJECTS_GLOBS=os.path.join(
+                          tmp, "nowhere", "*.xml") + os.pathsep + elsewhere))
+        check("open/AUTOPROMPT_RECENT_PROJECTS_GLOBS replaces the product globs", rc == 0
+              and "not relaunched" in out, out)
+        run(home, ["clear", hp])
+        os.remove(new_xml)
+        shutil.rmtree(os.path.dirname(os.path.dirname(old_xml)))
+        droid_hp = make_repo(os.path.join(home, "Desktop", "droid_hp"),
+                             {"local.properties": "sdk.dir=/x\n"})
+        recent_projects(os.path.join(home, "Library", "Application Support", "Google",
+                                     "AndroidStudio2026.1.4", "options", "recentProjects.xml"),
+                        [("$USER_HOME$/Desktop/droid_hp", True)])
+        rc, out = run(home, ["send", droid_hp, "--prompt-stdin"], stdin="hi",
+                      env_extra={"AUTOPROMPT_RUNNING_APPS": "Android Studio"})
+        check("open/Android Studio reads its own recentProjects.xml", rc == 0
+              and "open in Android Studio but CCVI is not answering" in out, out)
+        run(home, ["clear", droid_hp])
+        shutil.rmtree(os.path.join(home, "Library", "Application Support", "Google",
+                                   "AndroidStudio2026.1.4", "options"))
 
         # ---- capability
         rc, out = run(home, ["show", plain])

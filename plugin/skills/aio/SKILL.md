@@ -391,7 +391,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.35 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.36 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
