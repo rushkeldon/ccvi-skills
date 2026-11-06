@@ -75,6 +75,15 @@ COMPOUND_MODES = {"plan", "exclude", "include", "agent-loop"}
 # before doing meaningful work), ceiling 99. Out-of-range is REFUSED, never clamped.
 AGENT_LOOP_PCT_MIN = 20
 AGENT_LOOP_PCT_MAX = 99
+# agent-loop's named settings, after the optional threshold, in any order. timerDuration
+# is the fallback wakeup in minutes (default 20; refused outside 20-60, never clamped).
+# subagents carries a model (peer | economy) and a requirement (required | optional); the
+# defaults (20, peer, required) are never stored, so a plain entry stays `agent-loop: 80`.
+AGENT_LOOP_TIMER_MIN = 20
+AGENT_LOOP_TIMER_MAX = 60
+AGENT_LOOP_TIMER_DEFAULT = 20
+SUBAGENT_MODELS = ("peer", "economy")
+SUBAGENT_REQUIREMENTS = ("required", "optional")
 MUTEX = {"plan": ("agent", "agent-loop"), "agent": ("plan", "agent-loop")}
 
 # One-line blurb emitted with each enter echo. `plan` is a template: {dir} is the active
@@ -94,10 +103,10 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.36:
+HELP_TEXT = """Modes · v0.0.37:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
-• agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99); clears all modes on entry; mutex with plan/agent
+• agent-loop [pct] [timerDuration=N] [subagents=peer|economy[,optional]] — autonomous keep-moving loop; hand-off at pct% context (20-99); wakeup every N min (20-60, default 20); clears all modes on entry; mutex with plan/agent
 • one-word — single-word responses
 • sbs — step-by-step; one step then wait
 • exclude <globs> — block writes matching globs
@@ -328,13 +337,80 @@ def write_state(session_dir, state):
 # --------------------------------------------------------------------------------------
 
 
+def parse_agent_loop_param(text):
+    """Parse an agent-loop param string into its settings dict, or raise ValueError.
+
+    Accepts an optional leading threshold, then `timerDuration=N` and
+    `subagents=<v>[,<v>]` in any order. Returns only the parts that were given:
+    keys `pct`, `timer`, and `subagents` (a (model, requirement) pair, defaults filled)."""
+    parts = {}
+    tokens = (text or "").split()
+    if tokens and "=" not in tokens[0]:
+        pct = tokens.pop(0)
+        if (not re.fullmatch(r"\d{1,3}", pct)
+                or not (AGENT_LOOP_PCT_MIN <= int(pct) <= AGENT_LOOP_PCT_MAX)):
+            raise ValueError("agent-loop threshold must be an integer {}-{}".format(
+                AGENT_LOOP_PCT_MIN, AGENT_LOOP_PCT_MAX))
+        parts["pct"] = int(pct)
+    for tok in tokens:
+        name, sep, value = tok.partition("=")
+        if not sep:
+            raise ValueError("agent-loop settings are name=value: {}".format(tok))
+        if name == "timerDuration":
+            if "timer" in parts:
+                raise ValueError("agent-loop timerDuration given twice")
+            if (not re.fullmatch(r"\d{1,3}", value)
+                    or not (AGENT_LOOP_TIMER_MIN <= int(value) <= AGENT_LOOP_TIMER_MAX)):
+                raise ValueError("agent-loop timerDuration must be an integer {}-{} (minutes)".format(
+                    AGENT_LOOP_TIMER_MIN, AGENT_LOOP_TIMER_MAX))
+            parts["timer"] = int(value)
+        elif name == "subagents":
+            if "subagents" in parts:
+                raise ValueError("agent-loop subagents given twice")
+            values = [v.strip() for v in value.split(",") if v.strip()]
+            models = [v for v in values if v in SUBAGENT_MODELS]
+            reqs = [v for v in values if v in SUBAGENT_REQUIREMENTS]
+            unknown = [v for v in values if v not in SUBAGENT_MODELS + SUBAGENT_REQUIREMENTS]
+            if not values or unknown or len(models) > 1 or len(reqs) > 1:
+                raise ValueError("agent-loop subagents takes one of peer|economy and/or one of "
+                                 "required|optional: {}".format(value))
+            parts["subagents"] = (models[0] if models else "peer", reqs[0] if reqs else "required")
+        else:
+            raise ValueError("unknown agent-loop setting: {}".format(name))
+    return parts
+
+
+def render_agent_loop_param(parts):
+    """Normalized param string for stored settings: threshold, then timerDuration, then
+    subagents (model first), each omitted at its default. None when nothing is stored."""
+    out = []
+    if parts.get("pct") is not None:
+        out.append(str(parts["pct"]))
+    if parts.get("timer") not in (None, AGENT_LOOP_TIMER_DEFAULT):
+        out.append("timerDuration={}".format(parts["timer"]))
+    model, req = parts.get("subagents") or ("peer", "required")
+    sub = [v for v in (model, req) if v not in ("peer", "required")]
+    if sub:
+        out.append("subagents=" + ",".join(sub))
+    return " ".join(out) or None
+
+
 def blurb_for(mode, param):
     """The one-line blurb for an enter echo. `plan` substitutes its active directory;
-    `agent-loop` appends its rollover threshold when one is stored (bare -> static blurb)."""
+    `agent-loop` appends each stored setting (bare -> static blurb)."""
     if mode == "plan":
         return PLAN_BLURB.format(dir=(param if param else "./"))
     if mode == "agent-loop" and param:
-        return BLURBS["agent-loop"] + "; hand-off at {}% context usage".format(param)
+        parts = parse_agent_loop_param(param)
+        blurb = BLURBS["agent-loop"]
+        if "pct" in parts:
+            blurb += "; hand-off at {}% context usage".format(parts["pct"])
+        if parts.get("timer"):
+            blurb += "; wakeup every {} min".format(parts["timer"])
+        if parts.get("subagents"):
+            sub = [v for v in parts["subagents"] if v not in ("peer", "required")]
+            blurb += "; sub-agents {}".format(",".join(sub))
+        return blurb
     return BLURBS.get(mode, "")
 
 
@@ -413,8 +489,8 @@ LAW = {
     ),
     "agent-loop": (
         "⛔ AGENT-LOOP MODE — a standing keep-moving contract, in force on EVERY turn until the user exits it. Running the fast-path script does NOT discharge it; enforcement is yours every turn, script or not. Entering the mode is DORMANT arming only — it starts no work, schedules no wakeup, spawns nothing; turns end normally while no work is assigned. The MOMENT work starts (you are told the work, or you begin work already known), the flywheel engages and these bind:\n"
-        "• LAND WITH WORK IN FLIGHT AND A WAKEUP ARMED, or do not land. The binding check is at the LANDING: in flight means a RUNNING SUB-AGENT; a wakeup with nothing running is NOT compliance, and doing a unit yourself is compliance only while the turn lasts, never a state to land in.\n"
-        "• arm FIRST on seeded and resumed turns — and on any woken turn — before any work, because a turn that dies before its first tool call leaves NOTHING armed. The wakeup is LONG (20+ min), is insurance behind running work rather than a schedule, and carries this mode's own re-entry brief as its prompt, never a generic sentinel.\n"
+        "• LAND WITH WORK IN FLIGHT AND A WAKEUP ARMED, or do not land. The binding check is at the LANDING: in flight means a RUNNING SUB-AGENT; a wakeup with nothing running is NOT compliance, and doing a unit yourself is compliance only while the turn lasts, never a state to land in. The one exception is an entry carrying `subagents=optional`: there a landing with the wakeup armed is compliant, and the wakeup is still mandatory.\n"
+        "• arm FIRST on seeded and resumed turns — and on any woken turn — before any work, because a turn that dies before its first tool call leaves NOTHING armed. The wakeup is LONG (the entry's `timerDuration` minutes, 20 when unset), is insurance behind running work rather than a schedule, and carries this mode's own re-entry brief as its prompt, never a generic sentinel.\n"
         "• EVERY WAKE RE-ESTABLISHES THE INVARIANT FIRST — a returning worker spawns its successor; a wakeup firing with nothing in flight spawns before it does anything else.\n"
         "• DELEGATE BY DEFAULT, IN PARALLEL wherever independent units exist — one worker is the floor, not the target. gate exclusive resources: a resource only one worker can safely hold gets AT MOST ONE holder, and the next worker gets non-conflicting work rather than a queue position.\n"
         "• DECIDE, LOG, CONTINUE. Stop and ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance cannot arbitrate; destructive actions; real-world money. Cost and effort forecasts are NEVER a reason to stop, shrink or ask — yours run in human-engineer units and are reliably wrong.\n"
@@ -646,23 +722,21 @@ def apply_enter(state, mode, rest):
     # semantics mirror exclude — a NEW value updates ("now active"), a bare or identical
     # re-entry preserves what's stored ("already active") and never erases it.
     if mode == "agent-loop":
-        param = rest.strip() or None
-        if param is not None:
-            if (not re.fullmatch(r"\d{1,3}", param)
-                    or not (AGENT_LOOP_PCT_MIN <= int(param) <= AGENT_LOOP_PCT_MAX)):
-                # Out of range / non-numeric -> ask, don't clamp and don't write (same
-                # fallback-to-ask treatment as empty pattern args).
-                raise ValueError("agent-loop threshold must be an integer {}-{}".format(
-                    AGENT_LOOP_PCT_MIN, AGENT_LOOP_PCT_MAX))
-            param = str(int(param))  # normalize e.g. "020" -> "20"
+        # Any invalid part -> ValueError -> ask, don't clamp and don't write (same
+        # fallback-to-ask treatment as empty pattern args).
+        given = parse_agent_loop_param(rest)
         already = "agent-loop" in new_state
         if already:
             stored = new_state.get("agent-loop")
-            if param is None or param == stored:
-                # bare or same-N re-entry: idempotent, stored threshold preserved
+            merged = parse_agent_loop_param(stored)
+            merged.update(given)  # a given setting replaces only that setting
+            param = render_agent_loop_param(merged)
+            if not given or param == stored:
+                # bare or same-settings re-entry: idempotent, stored settings preserved
                 return new_state, enter_echo("agent-loop", stored, new_state, [], True), True
-            new_state["agent-loop"] = param  # new N: update in place, layered modes survive
+            new_state["agent-loop"] = param  # changed settings: update in place, layered modes survive
             return new_state, enter_echo("agent-loop", param, new_state, [], False), True
+        param = render_agent_loop_param(given)
         displaced = sorted(new_state.keys())
         new_state = {"agent-loop": param}
         return new_state, enter_echo("agent-loop", param, new_state, displaced, False), True

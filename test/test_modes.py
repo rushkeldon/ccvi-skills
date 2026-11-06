@@ -441,10 +441,42 @@ def main():
     _, _, final = run("agent-loop 020", seed=AGENT_ONLY)
     check("pct/normalize", final == "# Active modes\n\n- agent-loop: 20\n", repr(final))
     out, _, _ = run("", seed=AGENT_ONLY)
-    check("pct/help-line", "• agent-loop [pct] — autonomous keep-moving loop; hand-off at pct% context (20-99);"
+    check("pct/help-line", "• agent-loop [pct] [timerDuration=N] [subagents=peer|economy[,optional]] — "
+          "autonomous keep-moving loop; hand-off at pct% context (20-99);"
           in echo_of(out), repr(echo_of(out)))
     # a parameterized entry stays inert to the write hook
     check("pct/hook-noop", run_hook("Write", "/proj/foo.py", "# Active modes\n\n- agent-loop: 20\n") is None)
+
+    # 21b. agent-loop's named settings (timerDuration, subagents) — normalized storage,
+    # refusal without a write, partial re-entry, and the law clauses they unlock.
+    def al(body):
+        return "# Active modes\n\n- agent-loop: {}\n".format(body)
+    _, rc, final = run("agent-loop 80 subagents=optional timerDuration=25", seed=AGENT_ONLY)
+    check("set/normalized", rc == 0 and final == al("80 timerDuration=25 subagents=optional"), repr(final))
+    _, _, final = run("agent-loop subagents=optional,economy", seed=AGENT_ONLY)
+    check("set/model-first", final == al("subagents=economy,optional"), repr(final))
+    _, _, final = run("agent-loop 80 timerDuration=20 subagents=peer,required", seed=AGENT_ONLY)
+    check("set/defaults-omitted", final == al("80"), repr(final))
+    for bad, tag in (("timerDuration=10", "timer-low"), ("timerDuration=61", "timer-high"),
+                     ("subagents=peer,economy", "two-models"), ("subagents=required,optional", "two-reqs"),
+                     ("subagents=fast", "unknown-value"), ("speed=9", "unknown-name"),
+                     ("80 80", "bare-extra"), ("timerDuration=25 timerDuration=30", "dup")):
+        _, rc, final = run("agent-loop " + bad, seed=AGENT_ONLY)
+        check("set/refuse-" + tag, rc != 0 and final == AGENT_ONLY, repr((rc, final)))
+    _, rc, final = run("agent-loop subagents=economy", seed=al("80 timerDuration=25 subagents=optional"))
+    check("set/partial-reentry", rc == 0 and final == al("80 timerDuration=25 subagents=economy"), repr(final))
+    out, _, final = run("agent-loop", seed=al("80 timerDuration=25 subagents=optional"))
+    check("set/bare-reentry-keeps", final == al("80 timerDuration=25 subagents=optional")
+          and "already active" in echo_of(out), repr(final))
+    out, _, _ = run("agent-loop 80 timerDuration=25 subagents=optional", seed=AGENT_ONLY)
+    check("set/blurb", "wakeup every 25 min; sub-agents optional" in echo_of(out), repr(echo_of(out)))
+    check("set/law-optional", "The one exception is an entry carrying `subagents=optional`: there a landing "
+          "with the wakeup armed is compliant, and the wakeup is still mandatory." in out, "")
+    check("set/law-timer", "The wakeup is LONG (the entry's `timerDuration` minutes, 20 when unset)" in out, "")
+    check("set/law-strict-default", "a wakeup with nothing running is NOT compliance" in out, "")
+    check("set/body-settings", "**Settings (optional `name=value` params).**" in open(SKILL_MD, encoding="utf-8").read()
+          and "Forks always inherit the parent's model" in open(SKILL_MD, encoding="utf-8").read(), "")
+    check("set/hook-noop", run_hook("Write", "/proj/foo.py", al("80 timerDuration=25 subagents=optional")) is None)
 
     # 22. THE ANTI-EROSION GUARD. Each pinned phrase in this file is a lesson someone decided
     # was load-bearing; prose lessons decay silently, a pinned one cannot. On 2026-09-10 this
@@ -489,7 +521,7 @@ def main():
     # and fails here; re-pointing one (law -> body) keeps it and passes, because the lesson
     # still exists. Raise it when you add checks. LOWERING it is the act this floor exists to
     # make visible — treat that as a stop-and-ask, not a judgment call.
-    MIN_CHECKS = 133
+    MIN_CHECKS = 152
     if _count < MIN_CHECKS:
         _failures.append(
             "harness/no-erosion  check count {} is below the floor {} — a tripwire was "
