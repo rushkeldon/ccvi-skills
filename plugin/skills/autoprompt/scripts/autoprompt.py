@@ -716,6 +716,24 @@ def app_running(app):
     return False
 
 
+# `open -a` hands the CALLER's environment to a newly launched app (probed 2026-11-06 with a
+# throwaway .app that dumped its env: PROBE_LEAK=1 and the agent's CLAUDECODE=1 both arrived).
+# The caller is a Claude Code Bash tool, whose env carries that session's settings.json env
+# block. A Bedrock session (CLAUDE_CODE_USE_BEDROCK, AWS_PROFILE, ANTHROPIC_MODEL) autoprompting
+# a personal project therefore launched IntelliJ ON BEDROCK: the IDE passed the vars to the
+# sidecar and every `claude` child, where real env beats any --settings binding, and IntelliJ's
+# own restart preserves them. So the launch gets what a Dock launch would get, nothing more.
+LAUNCH_ENV_KEEP = ("HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "SSH_AUTH_SOCK",
+                   "__CF_USER_TEXT_ENCODING", "LANG")
+LAUNCHD_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
+
+
+def launch_env():
+    env = {k: v for k, v in os.environ.items() if k in LAUNCH_ENV_KEEP or k.startswith("LC_")}
+    env["PATH"] = LAUNCHD_PATH
+    return env
+
+
 def launch_ide(editor_id, project_dir):
     """-> a report fragment. Idempotent: see the module docstring's launch guards."""
     app = APP.get(editor_id)
@@ -732,7 +750,11 @@ def launch_ide(editor_id, project_dir):
         return 'would run: open -a "%s" "%s"' % (app, project_dir)
     if sys.platform != "darwin":
         return "launch unsupported on %s - not launched" % sys.platform
-    r = subprocess.run(["open", "-a", app, project_dir], capture_output=True, text=True)
+    # Resolve `open` on the CALLER's PATH: with env= given, subprocess searches the scrubbed
+    # PATH instead, which skipped the test's fake `open` and ran the real one.
+    open_bin = shutil.which("open") or "/usr/bin/open"
+    r = subprocess.run([open_bin, "-a", app, project_dir], capture_output=True, text=True,
+                       env=launch_env())
     if r.returncode != 0:
         return "launch failed: %s" % (r.stderr.strip() or "open exited %d" % r.returncode)
     record_launch(editor_id, project_dir)
