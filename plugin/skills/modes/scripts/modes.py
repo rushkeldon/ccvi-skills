@@ -103,7 +103,7 @@ BLURBS = {
     "include": "only allow writes matching listed patterns",
 }
 
-HELP_TEXT = """Modes · v0.0.37:
+HELP_TEXT = """Modes · v0.0.38:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] [timerDuration=N] [subagents=peer|economy[,optional]] — autonomous keep-moving loop; hand-off at pct% context (20-99); wakeup every N min (20-60, default 20); clears all modes on entry; mutex with plan/agent
@@ -477,6 +477,7 @@ LAW = {
         "\"can't — plan mode; only markdown writes allowed\", then offer to exit plan mode "
         "(/modes agent) if they want it done\n"
         "• Read / Glob / Grep / read-only Bash → unaffected\n"
+        "• status reports → allowed: `agents_report.py put` and `status_report.py put` only, by name; no other write is excused\n"
         "If you are about to write a non-.md file you have already erred — refuse and "
         "surface it; never \"just this once\"."
     ),
@@ -496,7 +497,7 @@ LAW = {
         "• DECIDE, LOG, CONTINUE. Stop and ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance cannot arbitrate; destructive actions; real-world money. Cost and effort forecasts are NEVER a reason to stop, shrink or ask — yours run in human-engineer units and are reliably wrong.\n"
         "• STATE WHAT MUST BE RESOLVED, AND THE CHECK THAT PROVES IT, BEFORE NAMING ANY TOOL. An unusable result restarts at that statement, never at a write-up — re-tooling produces nothing visible and is still the work.\n"
         "• REPORT TRUTHFULLY — \"nothing will wake me\" is a sentence to WRITE, never a state to conceal; a turn ending on a wait names what is running and what wakes it; a summary never promises work the turn did not do; and A NUMBER IS REPORTED WITH THE OUTPUT OF ITS CHECK BESIDE IT.\n"
-        "• KEEP THE LIVE PLAN OR STATUS SURFACE TRUE IN REAL TIME — flip the unit to in_progress at the launch that commits to it, to completed only once its done-when is verified (a worker's self-report is evidence, not the verdict), to a truthful terminal state promptly on a bail. Every flip is the orchestrator's; a worker never touches it.\n"
+        "• KEEP THE LIVE PLAN OR STATUS SURFACE TRUE IN REAL TIME — flip the unit to in_progress at the launch that commits to it, to completed only once its done-when is verified (a sub-agent's self-report is evidence, not the verdict; a work order handed to another session is verified by that session's isDone), to a truthful terminal state promptly on a bail. Every flip is the orchestrator's; a worker never touches it.\n"
         "• EVERY WORKER BRIEF DRAWS ITS FENCE — what it owns, and what it must never touch: the plan, the autonomy log, other units' files. It commits its own named pathspec or nothing at all — NEVER add-all, which sweeps racing siblings' edits into your commit.\n"
         "• rollover threshold — when the mode entry carries a percentage (`agent-loop: N`), N% context usage is the hand-off point: drain in-flight work first, spawn nothing new, author the seed, request the fresh session. Checked at every landing, because nothing else triggers it.\n"
         "• MECHANISM IS LOOKUP, NOT LAW — the autonomy-log path ladder, rollover detection, model economy, degradation on a host missing a capability, the cron prohibition, hand-off pacing and plan surfacing all live in the skill body. Read that section once when the flywheel first engages.\n"

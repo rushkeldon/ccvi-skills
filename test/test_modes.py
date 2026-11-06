@@ -517,11 +517,23 @@ def main():
         check("win/slug-posix[{}]".format(label),
               slug_fn("/Users/x/proj") == "-Users-x-proj", slug_fn("/Users/x/proj"))
 
+    # 24. Status reports are the plan law's one write exception, by name; and a session's isDone
+    # is a verdict where a sub-agent's self-report is only evidence (agent_workspaces_slots_redesign
+    # plan, 2026-11-06).
+    out, _, _ = run("plan ./doc", seed=AGENT_ONLY)
+    check("law/status-report-exception", "`agents_report.py put` and `status_report.py put` only, by name; "
+          "no other write is excused" in out, "")
+    check("law/status-report-exception-md", "• status reports → allowed: `agents_report.py put`"
+          in extract_law_block(open(SKILL_MD, encoding="utf-8").read(), "plan"), "")
+    check("aloop/session-verdict", "a sub-agent's self-report is evidence, not the verdict; a work order "
+          "handed to another session is verified by that session's isDone" in modes_mod.LAW["agent-loop"], "")
+    check("aloop/session-verdict-no-worker", "(a worker's self-report" not in modes_mod.LAW["agent-loop"], "")
+
     # THE ANTI-EROSION FLOOR (see the guard comment above). Deleting a check drops the count
     # and fails here; re-pointing one (law -> body) keeps it and passes, because the lesson
     # still exists. Raise it when you add checks. LOWERING it is the act this floor exists to
     # make visible — treat that as a stop-and-ask, not a judgment call.
-    MIN_CHECKS = 152
+    MIN_CHECKS = 156
     if _count < MIN_CHECKS:
         _failures.append(
             "harness/no-erosion  check count {} is below the floor {} — a tripwire was "
