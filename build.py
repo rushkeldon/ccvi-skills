@@ -237,6 +237,8 @@ MANIFEST_SKILLS = [
       {"name": "html list", "params": [_param("scope", False, "freeform")]},
       {"name": "html url", "params": [_param("name", True, "freeform")]},
       {"name": "html archive", "params": [_param("name", True, "freeform")]},
+      {"name": "html toast", "params": [_param("name", True, "freeform"),
+                                        _param("scope", False, "freeform")]},
     ],
   },
 ]

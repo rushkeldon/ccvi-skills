@@ -1,8 +1,8 @@
 ---
 name: aio
-description: hashcmd write•list•show•move•archive and html write•list•url•archive - author and manage the CCVI aio workspace at two scopes (this project's aio or the global aio) via /aio [noun] [verb]. hashcmd manages hash commands (`#name payload` turns the sidecar expands); html scaffolds, lists, locates, and retires web pages, sites, and apps the sidecar serves at /aio/<name>/ on each window's loopback port, with live JSON data push and controls that send #commands back as ordinary turns. Use when the user or an agent wants to create, inspect, promote, demote, or retire a #command, asks what #commands resolve here, or wants a dashboard, status page, or any served page for this project or every project.
+description: hashcmd write•list•show•move•archive and html write•list•url•archive•toast - author and manage the CCVI aio workspace at two scopes (this project's aio or the global aio) via /aio [noun] [verb]. hashcmd manages hash commands (`#name payload` turns the sidecar expands); html scaffolds, lists, locates, retires, and displays as a macOS toast the web pages, sites, and apps the sidecar serves at /aio/<name>/ on each window's loopback port, with live JSON data push, a file-backed store, and controls that send #commands back as ordinary turns. Use when the user or an agent wants to create, inspect, promote, demote, or retire a #command, asks what #commands resolve here, wants a dashboard, status page, or any served page for this project or every project, or wants to notify the user or ask them a choice with a toast.
 argument-hint: "[noun] [verb] {name} [scope]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(cat:*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(cat:*), Bash(~/.ccvi/node/current/bin/node:*)
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
 # for the model; this block MIRRORS it for a host that renders a verb menu and
 # generates each verb's dialog from `params`. Every fact here MUST also be stated in
@@ -21,6 +21,8 @@ verbs:
   "html list":       { order: 7, params: [ { name: scope, type: string, required: false } ] }
   "html url":        { order: 8, params: [ { name: name,  type: string, required: true } ] }
   "html archive":    { order: 9, params: [ { name: name,  type: string, required: true } ] }
+  "html toast":      { order: 10, params: [ { name: name,  type: string, required: true },
+                                            { name: scope, type: string, required: false } ] }
 ---
 
 # aio
@@ -47,10 +49,17 @@ One layout at two scopes:
   hash_cmds/<name>.md
   html/<name>/index.html, data/*.json                 served by EVERY window at /aio/ccvi/<name>/
   html/index.html                                     optional; replaces the built-in /aio/ccvi/ listing
+  html/ccvi_store.json                                the shared store, for values every page wants
 ~/.ccvi/projects/<encodedProjectPath>/aio/            project - wins on a name collision
   hash_cmds/<name>.md
   html/<name>/index.html, data/*.json                 served by THIS window at /aio/<name>/
   html/index.html                                     optional; replaces the built-in /aio/ listing
+
+Inside any html/<name>/ (either scope):
+  ccvi_manifest.json                                  optional metadata: label, order, hidden, failover, toast
+  data/ccvi_store.json                                the page's store (created on first write)
+  data/instance_<id>.json                             one displayed instance's own data (a toast)
+html/themes/<name>.css                                a toast theme: one CSS file
 ```
 
 **Resolve both paths, and the page-server origin, from the `<ccvi-aio>` sentinel** the CCVI
@@ -63,11 +72,14 @@ global: /Users/k/.ccvi/aio
 project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-projectx/aio
 prefix: projectx-
 url: http://127.0.0.1:17396/
+toast: /Users/k/.ccvi/toast/toast_display.mjs
 </ccvi-aio>
 ```
 
 `url` is this window's page-server origin. It is absent until the server has bound; a later
-turn carries a new block with a higher `epoch` that has it.
+turn carries a new block with a higher `epoch` that has it. `toast` is the toast script's
+absolute path, present only on macOS with the toast host installed: **no `toast` line means
+toasts are unavailable on this host.**
 
 Every worktree of a repository shares the same project aio (the host links them), so anything
 written in one worktree window is visible in all of them.
@@ -106,12 +118,14 @@ Single entry point - **`/aio [noun] [verb] [args]`**, dispatching on the first t
 | `/aio html list [scope]` | The html entries that exist, with their labels and URLs |
 | `/aio html url {name}` | Print the URL of an entry (project first, then global) |
 | `/aio html archive {name}` | Move `<scope>/html/<name>/` into `<scope>/html/archive/<name>/`; never deletes |
+| `/aio html toast {name} [scope]` | Display an entry as a macOS toast through the toast script; `scope` pins `project` or `global` (default: project first, then global) |
 | `/aio` (no args) | Print the help cheat-sheet (see **Help output**) |
 
 Nouns and verbs are lowercase. A bare noun (`/aio hashcmd`, `/aio html`) prints the help
 output. Natural language maps the obvious way: "make a hash command for X" -> `hashcmd write`;
 "what #commands do I have?" -> `hashcmd list`; "retire #foo" -> `hashcmd archive`; "make me a
-dashboard for X" -> `html write`; "where is my status page?" -> `html url`.
+dashboard for X" -> `html write`; "where is my status page?" -> `html url`; "ping me when this
+is done" or "ask me with a toast" -> `html toast`.
 
 ---
 
@@ -213,14 +227,36 @@ fill it from one row.
 The folder is named `html` after the classic web-server document root (`/var/www/html`,
 `~/public_html`). Each entry under it is a folder that may be a webpage, a website, or a web
 app. An entry is plain HTML plus ES-module or classic script, with no build step and nothing
-loaded from a CDN. It includes the sidecar's runtime, `/ccvi.js`, which connects back to the
-window that served it and gives the page three things: live JSON data pushed from
-`data/*.json`, the window's idle/working status, and `CCVI.send(text)`, which submits an
-ordinary user turn, so a button can emit a `#command`.
+loaded from a CDN. The server **injects** the runtime, `/ccvi.js`, at the top of `<head>` of
+every html document it serves, so a page carries no script tag for it (an old page that still
+has one is harmless). The runtime connects back to the window that served the page and gives
+it `window.CCVI`: live JSON data pushed from `data/*.json`, the window's idle/working status, a
+file-backed store, and `CCVI.send(text)`, which submits an ordinary user turn, so a button can
+emit a `#command`.
 
 Agent to page is **files**: the agent writes `html/<name>/data/*.json` with its normal Write
 tool and every connected page re-renders. Page to agent is **a user turn**: a click is a human
 action, the same as typing.
+
+**A page and a toast are the same thing.** The only difference is where it is displayed: a
+browser tab, or the native macOS toast host. A toast is an ordinary entry in `html/`, uses the
+same runtime, and can be opened in a browser to develop it.
+
+### Page rules (binding for every page this skill writes)
+
+- **Compact-first; layout follows the viewport width** through ordinary responsive CSS (base
+  styles for a narrow card, `@media (min-width: ...)` to grow). A page never needs to know the
+  manifest's numbers.
+- **`data-display` on `<html>` is for host chrome only**: a transparent background, whether
+  dismiss and maximize controls exist. `CCVI.display` is an open set (`browser`, `toast`, more
+  later), so never write `display === 'browser' ? a : b`. A toast's panel is always
+  transparent; the page paints everything visible, so a full-page background shows as a solid
+  rectangle.
+- **A page reaches a window only through `window.CCVI`.** Never `fetch` the page's own origin
+  and never read `location.host`.
+- **A toast never sends without a click.** No `CCVI.send` from a timer, a load handler, or the
+  dismiss event. A timeout only dismisses.
+- **The body's own height is the toast's height**, so never give `body` a percentage height.
 
 ### URLs
 
@@ -246,38 +282,64 @@ opens `/aio/`, and its menu lists both scopes' entries by label.
 
 **Reserved names.** `html write` refuses `ccvi` (the URL segment for the global scope, so a
 project entry by that name could never be reached), `archive` (where `html archive` moves
-retired entries; never listed), and `index` (the global `html/index/` folder overrides the hub
-at `/`).
+retired entries; never listed), `index` (the global `html/index/` folder overrides the hub at
+`/`), and `themes` (toast themes). `options` and `turn_end` are the two **built-in** global
+pages; writing one at global scope is allowed only when the user asks to override the
+built-in, and a real folder of that name then wins.
 
-### Menu metadata
+### The manifest (`ccvi_manifest.json`)
 
-The built-in listings and the globe menu label each entry from the first 8 KB of its
-`index.html`:
+The one home for an entry's metadata. Every key is optional; no file means defaults:
 
-```text
-<meta name="ccvi:label" content="Status board">   the label (first rung), else <title>, else the folder name
-<meta name="ccvi:order" content="1">              an integer; ascending, unset last, then by label
-<meta name="ccvi:hidden" content="true">          left out of listings and the menu; its URL still serves
+```json
+{
+  "label": "Status board",
+  "order": 1,
+  "hidden": false,
+  "failover": true,
+  "toast": {
+    "width": 360,
+    "height": null,
+    "timeoutMs": 0,
+    "capturesOutside": false,
+    "description": "One line: what this toast does.",
+    "useWhen": "One line: when an agent should display it.",
+    "fields": {
+      "title": { "required": true },
+      "body": { "note": "plain text" }
+    }
+  }
+}
 ```
 
-Keep these tags and `<title>` near the top of `<head>`: anything after the first 8 KB is not
-seen. Two entries with the same label each get ` · <name>` appended in the menu.
+- `label` names the entry in listings and the globe menu (else `<title>`, else the folder
+  name); `order` sorts ascending, unset last, then by label; `hidden` leaves it out of listings
+  while its URL still serves. Two entries with the same label each get ` · <name>` appended.
+- `failover` (default true): when the serving window goes away, the page reloads on another
+  window. `false` opts out.
+- `toast.width` defaults to 360; `height: null` means "measure the content". A page whose
+  `toast` has a `description` is advertised by the toast script's `list`; any page can still
+  be displayed by name. `fields` is what `display` validates the data against.
+- Older pages carry `<meta name="ccvi:label|ccvi:order|ccvi:hidden">` tags instead. Those still
+  work as a fallback, and the manifest wins over them. Do not write them in new pages.
 
 ### `html write`
 
 `/aio html write {name} [scope]`
 
-1. Resolve the scope dir from the sentinel. Refuse the reserved names `ccvi`, `archive`, and
-   `index`. Refuse to overwrite an existing `index.html` unless the user asked to rewrite that
+1. Resolve the scope dir from the sentinel. Refuse the reserved names (see **Reserved
+   names**). Refuse to overwrite an existing `index.html` unless the user asked to rewrite that
    entry.
 2. Create `html/<name>/data/` and write `index.html` from the template below, substituting
-   `NAME`, `LABEL` (a short human label; default `NAME`), and `SCOPE`. Adapt the body to what
-   the user wants the page to show; keep the runtime include, the data wiring, and the
-   `ccvi:label` meta. Add `ccvi:order` or `ccvi:hidden` when the user asks for an order or for
-   the entry to stay out of the menu.
-3. If the page has controls, write `data/actions.json` (see **Actions**) and the hash commands
+   `NAME` and `LABEL` (a short human label; default `NAME`). Adapt the body to what the user
+   wants the page to show, following the **Page rules**; keep the data wiring. Write no
+   `<script src="/ccvi.js">` tag and no `ccvi:*` meta tags.
+3. Write `ccvi_manifest.json` with `label`. Add `order` or `hidden` when the user asks for an
+   order or for the entry to stay out of the menu, and a `toast` block (with `description`,
+   `useWhen`, and `fields`) when the page is meant to be displayed as a toast.
+4. If the page has controls, write `data/actions.json` (see **Actions**) and the hash commands
    those actions emit (`/aio hashcmd write ...`), using the project prefix.
-4. Echo the absolute dir and the URL (`/aio html url {name}`).
+5. Echo the absolute dir and the URL (`/aio html url {name}`).
 
 **The scope index.** When the user asks to "make the index" (for a scope, with no `name`),
 write `<scope>/html/index.html` instead of a folder. It replaces the built-in listing at
@@ -292,30 +354,44 @@ link the other scope's index and `/`.
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="ccvi:label" content="LABEL">
-<title>NAME</title>
+<title>LABEL</title>
 <style>
   :root { color-scheme: light dark; }
-  body { margin: 0; padding: 24px 16px; font: 15px/1.45 system-ui, sans-serif; }
-  .status { opacity: .6; font-size: 13px; }
-  button { font: inherit; padding: 6px 12px; border-radius: 8px; }
+  body { margin: 0; padding: 8px; font: 14px/1.4 system-ui, sans-serif; }
+  .card { padding: 12px; border-radius: 12px; background: Canvas; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+  .status { opacity: .6; font-size: 12px; }
+  button { font: inherit; padding: 4px 10px; border-radius: 8px; }
+  @media (min-width: 640px) { body { padding: 24px; } .card { max-width: 960px; margin: 0 auto; } }
+  html[data-display="toast"] body { background: transparent; }
 </style>
 </head>
 <body>
-<h1>LABEL <span class="status" id="status"></span></h1>
-<div id="root">loading...</div>
-<script src="/ccvi.js" data-page="NAME" data-scope="SCOPE"></script>
+<div class="card">
+  <h1>LABEL <span class="status" id="status"></span></h1>
+  <label><input type="checkbox" id="compact"> compact</label>
+  <div id="root">loading...</div>
+</div>
 <script>
-  var actions = [];
+  var actions = [], last = null;
   CCVI.onStatus(function (s) { document.getElementById('status').textContent = s; });
-  CCVI.onData('actions.json', function (json) { actions = (json && json.actions) || []; });
-  CCVI.onData('NAME.json', function (json, error) {
+  CCVI.onData('actions.json', function (json) { actions = (json && json.actions) || []; if (last) { render(last); } });
+  // A toast carries its own data (data/instance_<id>.json); a browser tab reads the shared file.
+  if (CCVI.instance) { CCVI.onInstance(render); } else { CCVI.onData('NAME.json', render); }
+  // The store persists across reloads and copies of this page; the user's view choice lives there.
+  var box = document.getElementById('compact');
+  box.checked = !!CCVI.store.read('isCompact');
+  box.onchange = function () { CCVI.store.write('isCompact', box.checked); if (last) { render(last); } };
+  CCVI.store.onChanged(function (key, value) { if (key === 'isCompact') { box.checked = !!value; if (last) { render(last); } } });
+  function render(json, error) {
     var root = document.getElementById('root');
     if (error) { root.textContent = 'data error: ' + error; return; }
+    last = json;
     root.innerHTML = '';
     (json.rows || []).forEach(function (row) {
       var div = document.createElement('div');
-      div.textContent = row.title || JSON.stringify(row);
+      div.className = 'row';
+      div.textContent = box.checked ? (row.title || '') : (row.title || JSON.stringify(row));
       actions.forEach(function (a) {
         var b = document.createElement('button');
         b.textContent = a.label;
@@ -324,7 +400,7 @@ link the other scope's index and `/`.
       });
       root.appendChild(div);
     });
-  });
+  }
   function fill(tpl, row) { return tpl.replace(/\{(\w+)\}/g, function (_, k) { return row[k] == null ? '' : String(row[k]); }); }
 </script>
 </body>
@@ -332,7 +408,7 @@ link the other scope's index and `/`.
 ```
 
 The data file the template reads is `data/NAME.json`, shaped `{ "rows": [ { "title": ..., ... } ] }`.
-Change the shape freely; the only fixed parts are the runtime include and `CCVI.onData`.
+Change the shape freely; the only fixed parts are the `CCVI.onData` / `CCVI.onInstance` wiring.
 
 #### Actions
 
@@ -354,20 +430,44 @@ commands with the project prefix and author them with `/aio hashcmd write`.
 #### The runtime API (`/ccvi.js`)
 
 ```text
-CCVI.page, CCVI.scope          from the script tag's data-page / data-scope, else the URL (/aio/<name>/ is project, /aio/ccvi/<name>/ is global)
-CCVI.send(text)                submit a user turn in the serving window (hash expansion applies)
+CCVI.page, CCVI.scope          this entry's name and scope (from the server, else the URL)
+CCVI.display                   'browser' | 'toast' | ... (open set); also data-display on <html>
+CCVI.send(text, { to }?)       submit a user turn; resolves { ok, reason? }. No 'to' = the serving window;
+                               'to' = a sidecar pid, an absolute git dir, or a project folder name
+                               (resolved at click time; ok for another window means queued)
+CCVI.focusWindow({ to }?)      raise this window or another; never a turn, works mid-turn
 CCVI.onData(file, fn)          fn(json, error, frame) for data/<file> on attach and on change ('*' for all)
+CCVI.instance                  this display's instance id, or null
+CCVI.onInstance(fn)            like onData for data/instance_<id>.json; frame.removed = dismissed elsewhere
+CCVI.store.read(key)           the page store (data/ccvi_store.json); null when unset
+CCVI.store.write(key, value)   resolves { ok, reason? }; null removes the key
+CCVI.store.onChanged(fn)       fn(key, value) when ANOTHER copy or an agent changed a key
+CCVI.store.shared.*            the same three, on <global aio>/html/ccvi_store.json
 CCVI.onStatus(fn)              fn('idle' | 'working')
+CCVI.onFailover(fn)            fn('live' | 'lost' | 'moving')
 CCVI.directory(fn)             fn(directoryState | directoryAdd | directoryRemove) - every live window
+CCVI.toast.dismiss(reason?) / maximize() / restore() / resize({ width, height } | null)
+CCVI.toast.captureOutside(bool) / saveState(json) / playSound(name) / isMaximized()
+CCVI.toast.on(event, fn)       displayed | dismissed | maximized | restored | clickedOutside
 ```
 
-The runtime reconnects with backoff and queues sends while disconnected.
+The `toast` controls exist in every display, so a page never tests for them; in a browser they
+flip the same attributes with no host behind them, which is how a toast is styled in a browser.
+`<html>` carries `data-display`, `data-toast-state` (`restored` | `maximized`), and
+`data-toast-phase` (`intro` | `shown` | `outro`). The custom properties
+`--ccvi-toast-restore-ms` and `--ccvi-toast-outro-ms` on `<html>` give the restore and outro
+transitions time to run. Last writer wins on a store key; there is no locking.
+
+The runtime reconnects with backoff and queues sends while disconnected. Failover is a reload,
+so unsaved in-page state is lost: keep anything worth keeping in the store.
 
 ### `html list`
 
 `/aio html list [scope]` - glob `html/*/index.html` in both scopes (or the one given),
-skipping `archive/`, and print name, scope, label (read the `ccvi:label` meta, else the
-`<title>`, else the name; mark `ccvi:hidden` entries as hidden), and URL. Nothing is written.
+skipping `archive/` and `themes/`, and print name, scope, label (the manifest's `label`, else
+the `ccvi:label` meta, else the `<title>`, else the name; mark hidden entries), and URL.
+Nothing is written. The built-ins `options` and `turn_end` have no folder; list them as
+built-in global entries unless a real folder overrides them.
 
 ### `html url`
 
@@ -383,6 +483,58 @@ port lasts only for the window's lifetime, so say the URL is tied to this window
 Refuse when the destination already exists (never clobber; say what is there). If the move
 exposes a global entry of the same name, say so. Echo the new path.
 
+### `html toast`
+
+`/aio html toast {name} [scope]` - display an entry as a macOS toast, through the **toast
+script** named on the sentinel's `toast:` line. Writing the page is `html write`; this verb
+only displays it.
+
+1. **No `toast:` line in the sentinel: say toasts are unavailable on this host and stop.**
+   Never guess the script's path.
+2. Run the script with the CCVI node, from the project root (the script finds the calling
+   window by the cwd's git checkout):
+
+   ```bash
+   ~/.ccvi/node/current/bin/node <toast path> list               # pages that describe themselves as toasts
+   ~/.ccvi/node/current/bin/node <toast path> describe {name}    # when to use it, and its data fields
+   ```
+
+   Run `describe` before the first `display` of a page this session. Do not memorize or paste
+   the catalog; `list` is the catalog. The two built-in examples are `options` (ask the user
+   to pick one of several choices) and `turn_end` (tell the user a long task finished).
+3. Display it, with the data as one JSON object. Prefer `--data-stdin` with a quoted heredoc,
+   so quotes in the text need no escaping:
+
+   ```bash
+   ~/.ccvi/node/current/bin/node <toast path> display {name} [--scope project|global] [--id ID] \
+     [--theme NAME] [--timeout-ms N] [--dir auto|ltr|rtl] --data-stdin <<'JSON'
+   { "title": "Build finished", "body": "projectx 0.4.203 is packaged." }
+   JSON
+   ```
+
+   Pass `[scope]` as `--scope`. `--id` names the instance so a later `dismiss <id>` can take
+   it down; otherwise the script prints the id it chose.
+4. Relay the result by exit code:
+
+   ```text
+   0  displayed (the script prints the id)
+   2  bad request: unknown page, missing field, or bad argument. The output lists the
+      page's fields; it IS the field reference. Fix the data and retry once.
+   3  no live CCVI window to serve the toast
+   4  toast host not installed
+   ```
+
+`~/.ccvi/node/current/bin/node <toast path> dismiss <id>` takes a displayed toast down.
+
+**Use toasts sparingly.** A toast interrupts the user in whatever app they are in. Follow the
+page's `useWhen` (`turn_end` is for long tasks, never routine turn ends). The toast's buttons
+send only when clicked.
+
+**Themes.** A theme is one CSS file, `<scope>/html/themes/<name>.css`, loaded after the page's
+own styles. `--theme NAME` picks one per display, and a `toastTheme` key in the shared store
+sets the default. A project page may use a project or a global theme; a global page uses
+global themes only.
+
 ---
 
 ## Help output
@@ -391,7 +543,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.40 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.41 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
@@ -401,6 +553,7 @@ with exactly this - no preamble, no postscript:
 • html list [scope]              - the entries that exist, with labels and URLs
 • html url {name}                - the URL of an entry: /aio/<name>/ or /aio/ccvi/<name>/
 • html archive {name}            - move html/<name>/ to html/archive/<name>/; never deletes
+• html toast {name} [scope]      - display an entry as a macOS toast via the sentinel's toast: script (list, describe, display)
 
 Running a command is just typing it: #name payload. Agent -> page: write data/*.json.
 Page -> agent: CCVI.send('#command payload'), an ordinary turn. Paths come from the <ccvi-aio> sentinel.
@@ -413,5 +566,6 @@ Page -> agent: CCVI.send('#command payload'), an ordinary turn. Paths come from 
 - **It never edits `lib/` or anything beside `hash_cmds/` and `html/`** in the aio. Those are
   the commands' own files.
 - **It never writes outside the two aio scopes.**
+- **It never sends from a toast on its own.** A toast's send is the user's click.
 - **No build step, no CDN, no off-box serving.** Html is files the sidecar serves as they are,
   loopback only; this is not Promptdown.

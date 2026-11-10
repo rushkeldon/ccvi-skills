@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "skills": [
     {
       "name": "modes",
@@ -680,6 +680,21 @@
             {
               "name": "name",
               "required": true,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "html toast",
+          "params": [
+            {
+              "name": "name",
+              "required": true,
+              "kind": "freeform"
+            },
+            {
+              "name": "scope",
+              "required": false,
               "kind": "freeform"
             }
           ]
