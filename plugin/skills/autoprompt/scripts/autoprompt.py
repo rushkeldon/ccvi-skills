@@ -47,7 +47,7 @@ anyway. Two facts from the same spike shape them:
   (app_running), never pgrep.
 - recentProjects.xml is written lazily: the probe project never appeared in
   IntelliJIdea2026.2/options/recentProjects.xml, even after its window closed, while the
-  long-open dpp project read opened="true". So the opened="true" guard cannot see a
+  long-open projectx project read opened="true". So the opened="true" guard cannot see a
   just-launched project; the launch-memory guard is the one that covers the startup race.
 
 Everything home-relative goes through Path.home(), so a test can fake the whole machine by
@@ -679,7 +679,7 @@ def recent_projects_file(editor_id):
 
 def jetbrains_open(editor_id, project_dir):
     """True when the newest recentProjects.xml marks project_dir opened="true". Shape, ported
-    from dpp's agent_slots.py open_in_ide (verified 2026-11-02):
+    from projectx's agent_slots.py open_in_ide (verified 2026-11-02):
       <entry key="$USER_HOME$/Desktop/working/x"><value><RecentProjectMetaInfo opened="true"/>
     opened="true" survives a normal quit, so it means "open now" only while the IDE runs."""
     f = recent_projects_file(editor_id)

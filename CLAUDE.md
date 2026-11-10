@@ -157,8 +157,8 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   ```text
   <ccvi-aio epoch="2">
   global: /Users/k/.ccvi/aio
-  project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-dpp/aio
-  prefix: dpp-
+  project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-projectx/aio
+  prefix: projectx-
   url: http://127.0.0.1:17396/
   </ccvi-aio>
   ```

@@ -1,11 +1,11 @@
 ---
 name: work_skill_and_plugin_merge
 version: "1.0"
-overview: "Absorb dpp-skills into ccvi-skills (one plugin, one version, one BBPI), fold /pr into /repos as a noun verb, and add /work - a two-verb agent-to-agent work-assignment skill whose durable receipts guarantee a .response.md eventually reaches the requester. Three phases, independently landable in order: the merge is packaging, the fold is refactor, /work is new capability."
+overview: "Absorb projectx-skills into ccvi-skills (one plugin, one version, one BBPI), fold /pr into /repos as a noun verb, and add /work - a two-verb agent-to-agent work-assignment skill whose durable receipts guarantee a .response.md eventually reaches the requester. Three phases, independently landable in order: the merge is packaging, the fold is refactor, /work is new capability."
 isProject: false
 todos:
   - id: merge-inventory
-    content: "Move dpp-skills' skills and script into ccvi-skills/plugin/"
+    content: "Move projectx-skills' skills and script into ccvi-skills/plugin/"
     status: pending
     phase: Merge
   - id: merge-paths
@@ -13,7 +13,7 @@ todos:
     status: pending
     phase: Merge
   - id: merge-guard
-    content: "Bring dpp-skills' pre-commit guard and .gitignore-as-allowlist posture across"
+    content: "Bring projectx-skills' pre-commit guard and .gitignore-as-allowlist posture across"
     status: pending
     phase: Merge
   - id: merge-doctrine
@@ -25,7 +25,7 @@ todos:
     status: pending
     phase: Merge
   - id: merge-uninstall
-    content: "Retire the dpp-skills plugin install so no skill double-registers"
+    content: "Retire the projectx-skills plugin install so no skill double-registers"
     status: pending
     phase: Merge
   - id: merge-bbpi
@@ -45,7 +45,7 @@ todos:
     status: pending
     phase: PR fold
   - id: fold-pr-defaults
-    content: "Relocate the layer-1 review defaults and repoint dpp_api.py plus its selftest"
+    content: "Relocate the layer-1 review defaults and repoint projectx_api.py plus its selftest"
     status: pending
     phase: PR fold
   - id: work-contract
@@ -78,15 +78,15 @@ that only needs the merge to have happened so it lands in the right repo.
 
 ## Why all three are one plan
 
-They share one cause. `/work` is the mechanism dpp uses to reach a repo agent, dpp already
+They share one cause. `/work` is the mechanism projectx uses to reach a repo agent, projectx already
 hard-requires CCVI, and CCVI owns the `.{suffix}.md` namespace that `.request.md` and
-`.response.md` join. Once `/work` belongs in ccvi-skills, dpp-skills has nothing left that
+`.response.md` join. Once `/work` belongs in ccvi-skills, projectx-skills has nothing left that
 is meaningfully independent, so the merge and the new skill are the same decision seen from
 two ends.
 
 ## Decisions already made (do not re-open)
 
-- **ccvi-skills is the surviving plugin, repo, and marketplace.** dpp-skills is absorbed.
+- **ccvi-skills is the surviving plugin, repo, and marketplace.** projectx-skills is absorbed.
 - **`/pr` folds into `/repos`** as a noun verb, `/repos pr <action>`.
 - **`/idioms` stays its own skill.** It is not folded into `/cleancode`: cleancode is gated
   to a stabilized project with a green verdict, and "how does this repo usually do this?" is
@@ -97,7 +97,7 @@ two ends.
   alternative (`/repos forge <verb>` beside `/repos pr <verb>`) is **rejected**: the existing
   eight are a coherent set the picker and the user already know, and retrofitting a namespace
   onto them is churn for symmetry. Do not "fix" this asymmetry.
-- **Receipts live under `~/.ccvi/work/`**, not `~/.dpp/work/`. The shared root is already a
+- **Receipts live under `~/.ccvi/work/`**, not `~/.projectx/work/`. The shared root is already a
   documented cross-platform contract with pruning, and it is where `agent_state/` lives,
   which the orphan rule reads.
 - **`/work` is ONE skill with two verbs**, never two skills. `request` and `response` share
@@ -117,7 +117,7 @@ two ends.
   and bounded. Closing that hole is a separate, bigger decision.
 - **No `/repos forge` namespace.** See the asymmetry decision above.
 - **No Disney-specific content enters the plugin.** ccvi-skills ships inside a distributable
-  IntelliJ plugin zip. Site-specific material stays in `~/.dpp/`.
+  IntelliJ plugin zip. Site-specific material stays in `~/.projectx/`.
 
 ## Conventions this plan assumes
 
@@ -135,7 +135,7 @@ two ends.
 
 ### merge-inventory
 
-**Anchor:** `dpp-skills/plugin/skills/{pr,idioms}/` and `dpp-skills/plugin/scripts/dpp_api.py`.
+**Anchor:** `projectx-skills/plugin/skills/{pr,idioms}/` and `projectx-skills/plugin/scripts/projectx_api.py`.
 
 Move both skills and the shared script into `ccvi-skills/plugin/`, preserving
 `skills/pr/defaults/PR_REVIEW.md`. Keep `pr` as its own skill directory for this todo; the
@@ -143,23 +143,23 @@ fold into `/repos` is Phase 2 and must not be entangled with the move, so that a
 either is attributable.
 
 Sizes, for reference: `pr/SKILL.md` ~22.4 KB, `idioms/SKILL.md` ~13.7 KB,
-`defaults/PR_REVIEW.md` ~5.8 KB, `dpp_api.py` ~48 KB and zero-dependency.
+`defaults/PR_REVIEW.md` ~5.8 KB, `projectx_api.py` ~48 KB and zero-dependency.
 
-**Done when:** both skills are present under `ccvi-skills/plugin/skills/`, `dpp_api.py` is
-under `ccvi-skills/plugin/scripts/`, and `python3 plugin/scripts/dpp_api.py selftest` exits 0
+**Done when:** both skills are present under `ccvi-skills/plugin/skills/`, `projectx_api.py` is
+under `ccvi-skills/plugin/scripts/`, and `python3 plugin/scripts/projectx_api.py selftest` exits 0
 from the ccvi-skills checkout (all 7 suites).
 
 ### merge-paths
 
-**Anchor:** the `${CLAUDE_PLUGIN_ROOT}/scripts/dpp_api.py` invocations in both SKILL.md files,
-and the `DEFAULTS_REVIEW` constant in `dpp_api.py`.
+**Anchor:** the `${CLAUDE_PLUGIN_ROOT}/scripts/projectx_api.py` invocations in both SKILL.md files,
+and the `DEFAULTS_REVIEW` constant in `projectx_api.py`.
 
 Two couplings break on the move and must be fixed together:
 
-1. Both SKILL.md files call `${CLAUDE_PLUGIN_ROOT}/scripts/dpp_api.py`. `CLAUDE_PLUGIN_ROOT`
+1. Both SKILL.md files call `${CLAUDE_PLUGIN_ROOT}/scripts/projectx_api.py`. `CLAUDE_PLUGIN_ROOT`
    now resolves to the ccvi-skills plugin root, so the path is correct only once the script
-   actually sits at `scripts/dpp_api.py` there.
-2. `dpp_api.py` resolves layer-1 review defaults at `../skills/pr/defaults/PR_REVIEW.md`
+   actually sits at `scripts/projectx_api.py` there.
+2. `projectx_api.py` resolves layer-1 review defaults at `../skills/pr/defaults/PR_REVIEW.md`
    relative to itself. That relative path survives `merge-inventory` unchanged, but **not**
    `fold-pr-defaults` in Phase 2. Leave it alone here and change it there, in one commit with
    the file move.
@@ -169,16 +169,16 @@ skill's script path from an installed build resolves without a "no such file" er
 
 ### merge-guard
 
-**Anchor:** `dpp-skills/scripts/guard_staged.sh`, `guard_install.sh`, and the
+**Anchor:** `projectx-skills/scripts/guard_staged.sh`, `guard_install.sh`, and the
 `.gitignore`-as-allowlist rules.
 
 Bring the guard across and make it the merged repo's pre-commit hook. It is strictly additive
-safety for the CCVI skills, and it has already earned its keep: during the dpp-skills v1 build
+safety for the CCVI skills, and it has already earned its keep: during the projectx-skills v1 build
 it refused an internal hostname in `doc/probes.md`.
 
 Preserve the shape, not just the file: `.gitignore` is an **allowlist**, so a new top-level
 path is invisible to git until un-ignored; `git check-ignore -v <path>` names the rule hiding a
-path. The guard shares site-specific patterns from `~/.dpp/guard_patterns.txt` and runs
+path. The guard shares site-specific patterns from `~/.projectx/guard_patterns.txt` and runs
 gitleaks, and a fresh clone needs `scripts/guard_install.sh` once.
 
 **Done when:** the hook is installed in the ccvi-skills checkout, a deliberate test commit
@@ -187,17 +187,17 @@ top-level path.
 
 ### merge-doctrine
 
-**Anchor:** `ccvi-skills/CLAUDE.md`, and `dpp-skills/CLAUDE.md` as the source to merge from.
+**Anchor:** `ccvi-skills/CLAUDE.md`, and `projectx-skills/CLAUDE.md` as the source to merge from.
 
-Fold dpp-skills' doctrine in. Three items are load-bearing and must survive verbatim in
+Fold projectx-skills' doctrine in. Three items are load-bearing and must survive verbatim in
 substance:
 
 - **The generic-skill-text rule.** Site-specific material (approvers, slot counts, local
-  idioms, skip paths, markers) lives in `~/.dpp/repos/<remote>/PR_REVIEW.md`, Keldon's own
-  voice in `~/.dpp/PR_REVIEW.md`, runtime state under `~/.dpp`, credentials nowhere in the
+  idioms, skip paths, markers) lives in `~/.projectx/repos/<remote>/PR_REVIEW.md`, Keldon's own
+  voice in `~/.projectx/PR_REVIEW.md`, runtime state under `~/.projectx`, credentials nowhere in the
   repo. **This is what makes the merge safe at all**: ccvi-idea bundles the skills zip into a
   distributable, so the moment this lapses, Disney-specific text starts riding inside it.
-- **The layering framing.** dpp is the Program Manager and Personal Assistant; CCVI is the
+- **The layering framing.** projectx is the Program Manager and Personal Assistant; CCVI is the
   Developer. Keep it as the statement of what each skill is *for*, now that both live in one
   plugin and the repo boundary no longer carries that meaning.
 - **The dependency-tier table**, newly written here, as the only remaining record of what
@@ -229,15 +229,15 @@ and the new `scripts/` entry without a change to its logic; if it enumerates ski
 rather than by glob, extend that list.
 
 **Done when:** `python3 build.py --check` exits 0, and the built zip contains both new skills,
-`scripts/dpp_api.py`, and `skills/pr/defaults/PR_REVIEW.md`.
+`scripts/projectx_api.py`, and `skills/pr/defaults/PR_REVIEW.md`.
 
 ### merge-uninstall
 
-**Anchor:** `~/.claude/plugins/installed_plugins.json`, entry `dpp-skills@dpp-skills`, and
-`~/.claude/plugins/marketplaces/dpp-skills/`.
+**Anchor:** `~/.claude/plugins/installed_plugins.json`, entry `projectx-skills@projectx-skills`, and
+`~/.claude/plugins/marketplaces/projectx-skills/`.
 
 With both plugins installed, `pr` and `idioms` would register twice and the resolution order is
-not something to leave to chance. Remove the dpp-skills plugin and its marketplace registration
+not something to leave to chance. Remove the projectx-skills plugin and its marketplace registration
 after the merged build is installed, not before, so there is never a window with neither.
 
 **Why this ordering:** `claude plugin install` is a no-op on an already-installed plugin;
@@ -245,7 +245,7 @@ after the merged build is installed, not before, so there is never a window with
 machine without the skills.
 
 **Done when:** a fresh Claude Code session lists `pr` and `idioms` exactly once each, sourced
-from ccvi-skills, and `installed_plugins.json` has no `dpp-skills` entry.
+from ccvi-skills, and `installed_plugins.json` has no `projectx-skills` entry.
 
 ### merge-bbpi
 
@@ -354,7 +354,7 @@ existing note that `verbs:` `order:` is a host MENU order, deliberately not exec
 
 ### fold-pr-defaults
 
-**Anchor:** the `DEFAULTS_REVIEW` constant in `plugin/scripts/dpp_api.py`, and
+**Anchor:** the `DEFAULTS_REVIEW` constant in `plugin/scripts/projectx_api.py`, and
 `skills/pr/defaults/PR_REVIEW.md`.
 
 Move the defaults to `skills/repos/defaults/PR_REVIEW.md` and repoint `DEFAULTS_REVIEW`, which
@@ -364,7 +364,7 @@ currently resolves `../skills/pr/defaults/PR_REVIEW.md` relative to the script.
 defaults parse, so a half-applied change fails loudly rather than silently reading a stale path,
 but only if both halves are in the same change.
 
-**Done when:** `python3 plugin/scripts/dpp_api.py selftest` exits 0 with all 7 suites passing,
+**Done when:** `python3 plugin/scripts/projectx_api.py selftest` exits 0 with all 7 suites passing,
 and no path in the repo still references `skills/pr/`.
 
 ---
@@ -457,7 +457,7 @@ the repo's existing 7-day convention. A write to a missing or closed receipt is 
 log line, never a recreate** — otherwise a late duplicate resurrects a closed item.
 
 **Done when:** the doc states the two document types, the receipt shape, the guarantee, the
-invariant, the orphan rule, and the closure rules, and a reader could implement the dpp side
+invariant, the orphan rule, and the closure rules, and a reader could implement the projectx side
 against it without reading the skill.
 
 ### work-skill

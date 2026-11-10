@@ -39,8 +39,8 @@ isProject: false
 ## Problem / Context
 
 `/repos` polishes a PR privately on a local Forgejo forge, then exports it to
-the origin. Keldon's thinking has moved on since he wrote it, and his dpp work
-(`~/Desktop/working/dpp`, design in `doc/dpp_brainstorm.md`, section "Own PRs:
+the origin. Keldon's thinking has moved on since he wrote it, and his projectx work
+(`~/Desktop/working/projectx`, design in `doc/projectx_brainstorm.md`, section "Own PRs:
 forge first, then Disney's GitHub" and the `/repos` TODO) now builds on it:
 
 - **AI attribution is no longer blocked.** The trailer preflight in `status` and
@@ -50,7 +50,7 @@ forge first, then Disney's GitHub" and the `/repos` TODO) now builds on it:
   threads, so a deleted thread drops out exactly as a resolved one would.
 - **The forge is ephemeral.** Its only purpose is getting a PR into good shape
   before it goes to the origin, so it needs a periodic wipe.
-- **dpp's review skill may hold a review of someone else's PR** for Keldon to
+- **projectx's review skill may hold a review of someone else's PR** for Keldon to
   look at. Export needs to attach a pending review to an existing origin PR,
   not only to one it creates.
 
@@ -169,7 +169,7 @@ version and run this repo's BBPI procedure per `CLAUDE.md`. Done when:
   binary carries `DeleteIssue`). The live run above is what would confirm it.
 - **Param name.** The new export param is `originPr`, not `pr`, because `pr`
   already names the required forge PR. The tool flag is `github export --pr N`.
-  dpp-aa approved this.
+  projectx-aa approved this.
 - **Dry-run shape change.** `github export --dry-run` now prints
   `target.create_pr` or `target.existing_pr` in place of the old top-level `pr`
   key.

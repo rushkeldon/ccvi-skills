@@ -94,7 +94,7 @@ degrades to the single fixed slot until it does (see `gate-consumers`).
 
 - **Directory:** `$(git -C <target> rev-parse --absolute-git-dir)/ccvi/` - the PER-WORKTREE git
   dir, never `--git-common-dir`. That is what addresses exactly one window.
-- **Slots:** `auto_prompt.md` is slot 0 (unchanged, so dpp and other existing writers keep
+- **Slots:** `auto_prompt.md` is slot 0 (unchanged, so projectx and other existing writers keep
   working), then `auto_prompt_<N>.md` for N >= 1, unpadded. Match regex
   `^auto_prompt(_[1-9][0-9]*)?\.md$`; sort by parsed integer, bare = 0. The `\.md$` anchor
   excludes the consumer's in-flight `*.md.claimed-<pid>` names.

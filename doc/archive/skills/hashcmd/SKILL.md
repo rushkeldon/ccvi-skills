@@ -43,8 +43,8 @@ sentinel):
 ```text
 <ccvi-aio epoch="1">
 global: /Users/k/.ccvi/aio
-project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-dpp/aio
-prefix: dpp-
+project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-projectx/aio
+prefix: projectx-
 </ccvi-aio>
 ```
 
@@ -58,7 +58,7 @@ explicitly asks for `global`; otherwise ask rather than guess a project path.
 ## The project prefix
 
 Project-scope command names start with the project's **prefix** (the sentinel's third line,
-`dpp-` for a repo whose main checkout is `dpp`). It is a courtesy, not a correctness rule: a
+`projectx-` for a repo whose main checkout is `projectx`). It is a courtesy, not a correctness rule: a
 bare `#name` only ever resolves against THIS project and the globals, so two projects sharing a
 name never meet. The prefix keeps project names out of the space the global commands use, so
 a project command never silently shadows a global one. `write` applies it by default.
@@ -91,7 +91,7 @@ A name that fails the grammar is refused with the rule quoted.
 
 1. Resolve the scopes from the sentinel. Default `scope` is `project`.
 2. **At project scope, apply the prefix** unless `name` already starts with it: `write ack`
-   in the dpp window creates `dpp-ack.md`. If the user gives an unprefixed project name on
+   in the projectx window creates `projectx-ack.md`. If the user gives an unprefixed project name on
    purpose, say what global command it would shadow, if any (`ls <global>/hash_cmds/`), and
    write it unprefixed only after they confirm.
 3. At global scope, warn when a project command of the same name exists (the project one
@@ -100,7 +100,7 @@ A name that fails the grammar is refused with the rule quoted.
    the model receives. Write it as instructions to the agent that will run it, in the second
    person, and say how to read the payload (see **Authoring a command** below).
 5. `mkdir -p` the `hash_cmds/` dir, write the file, and echo the absolute path plus one line
-   on how to run it: `#dpp-ack <payload>`.
+   on how to run it: `#projectx-ack <payload>`.
 
 An existing file is OVERWRITTEN only when the user asked to write that exact name; say so in
 the echo. `write` never touches the other scope.
@@ -123,7 +123,7 @@ neither exists, say so and list near-miss names (same prefix, or a one-character
 
 `/hashcmd move {name} {scope}` - `mv` the definition from its current scope into `scope`.
 Refuse when the destination already has that name (never clobber; suggest `archive` first).
-Moving project -> global drops nothing from the name: `dpp-ack` stays `dpp-ack` globally
+Moving project -> global drops nothing from the name: `projectx-ack` stays `projectx-ack` globally
 unless the user asks to rename it in the same breath. Moving global -> project does NOT add
 the prefix automatically; say so and offer it. Echo both paths.
 
@@ -138,7 +138,7 @@ project one had shadowed, say so. Echo the new path.
 A command file is plain markdown and **is the prompt**. The sidecar wraps it:
 
 ```text
-<ccvi-hash-cmd name="dpp-ack" scope="project" path="/Users/k/.ccvi/projects/.../aio/hash_cmds/dpp-ack.md">
+<ccvi-hash-cmd name="projectx-ack" scope="project" path="/Users/k/.ccvi/projects/.../aio/hash_cmds/projectx-ack.md">
 ...the file, trimmed...
 </ccvi-hash-cmd>
 PD-123 looks resolved
@@ -165,7 +165,7 @@ Payload: an incident id (`PD-123`), optionally followed by a note.
 ```
 
 Pages emit commands too: a page's `actions.json` maps a control to a template such as
-`#dpp-ack {alertId}` (see `/pages`). Design the payload so a page can fill it from one row.
+`#projectx-ack {alertId}` (see `/pages`). Design the payload so a page can fill it from one row.
 
 ## Help output
 

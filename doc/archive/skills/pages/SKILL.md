@@ -126,8 +126,8 @@ Controls are DATA, not HTML, so the agent can add one without touching the page:
 ```json
 {
   "actions": [
-    { "id": "ack",     "label": "Ack",     "prompt": "#dpp-ack {alertId}" },
-    { "id": "explain", "label": "Explain", "prompt": "#dpp-explain {alertId}" }
+    { "id": "ack",     "label": "Ack",     "prompt": "#projectx-ack {alertId}" },
+    { "id": "explain", "label": "Explain", "prompt": "#projectx-explain {alertId}" }
   ]
 }
 ```

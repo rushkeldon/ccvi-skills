@@ -60,8 +60,8 @@ a paraphrase is not a sentinel):
 ```text
 <ccvi-aio epoch="2">
 global: /Users/k/.ccvi/aio
-project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-dpp/aio
-prefix: dpp-
+project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-projectx/aio
+prefix: projectx-
 url: http://127.0.0.1:17396/
 </ccvi-aio>
 ```
@@ -79,7 +79,7 @@ explicitly asks for `global`; otherwise ask rather than guess a project path.
 ### The project prefix
 
 Project-scope command names start with the project's **prefix** (the sentinel's third line,
-`dpp-` for a repo whose main checkout is `dpp`). It is a courtesy, not a correctness rule: a
+`projectx-` for a repo whose main checkout is `projectx`). It is a courtesy, not a correctness rule: a
 bare `#name` only ever resolves against THIS project and the globals, so two projects sharing a
 name never meet. The prefix keeps project names out of the space the global commands use, so
 a project command never silently shadows a global one. `hashcmd write` applies it by default.
@@ -129,7 +129,7 @@ not running them. Running one is typing `#name payload`.
 
 1. Resolve the scopes from the sentinel. Default `scope` is `project`.
 2. **At project scope, apply the prefix** unless `name` already starts with it: `hashcmd write
-   ack` in the dpp window creates `dpp-ack.md`. If the user gives an unprefixed project name
+   ack` in the projectx window creates `projectx-ack.md`. If the user gives an unprefixed project name
    on purpose, say what global command it would shadow, if any (`ls <global>/hash_cmds/`),
    and write it unprefixed only after they confirm.
 3. At global scope, warn when a project command of the same name exists (the project one
@@ -138,7 +138,7 @@ not running them. Running one is typing `#name payload`.
    the model receives. Write it as instructions to the agent that will run it, in the second
    person, and say how to read the payload (see **Authoring a command** below).
 5. `mkdir -p` the `hash_cmds/` dir, write the file, and echo the absolute path plus one line
-   on how to run it: `#dpp-ack <payload>`.
+   on how to run it: `#projectx-ack <payload>`.
 
 An existing file is OVERWRITTEN only when the user asked to write that exact name; say so in
 the echo. `hashcmd write` never touches the other scope.
@@ -161,7 +161,7 @@ neither exists, say so and list near-miss names (same prefix, or a one-character
 
 `/aio hashcmd move {name} {scope}` - `mv` the definition from its current scope into `scope`.
 Refuse when the destination already has that name (never clobber; suggest `hashcmd archive`
-first). Moving project -> global drops nothing from the name: `dpp-ack` stays `dpp-ack`
+first). Moving project -> global drops nothing from the name: `projectx-ack` stays `projectx-ack`
 globally unless the user asks to rename it in the same breath. Moving global -> project does
 NOT add the prefix automatically; say so and offer it. Echo both paths.
 
@@ -176,7 +176,7 @@ exposes a global command that the project one had shadowed, say so. Echo the new
 A command file is plain markdown and **is the prompt**. The sidecar wraps it:
 
 ```text
-<ccvi-hash-cmd name="dpp-ack" scope="project" path="/Users/k/.ccvi/projects/.../aio/hash_cmds/dpp-ack.md">
+<ccvi-hash-cmd name="projectx-ack" scope="project" path="/Users/k/.ccvi/projects/.../aio/hash_cmds/projectx-ack.md">
 ...the file, trimmed...
 </ccvi-hash-cmd>
 PD-123 looks resolved
@@ -203,7 +203,7 @@ Payload: an incident id (`PD-123`), optionally followed by a note.
 ```
 
 Html entries emit commands too: an entry's `actions.json` maps a control to a template such as
-`#dpp-ack {alertId}` (see **Actions** under the `html` noun). Design the payload so a page can
+`#projectx-ack {alertId}` (see **Actions** under the `html` noun). Design the payload so a page can
 fill it from one row.
 
 ---
@@ -341,8 +341,8 @@ Controls are DATA, not HTML, so the agent can add one without touching the page:
 ```json
 {
   "actions": [
-    { "id": "ack",     "label": "Ack",     "prompt": "#dpp-ack {alertId}" },
-    { "id": "explain", "label": "Explain", "prompt": "#dpp-explain {alertId}" }
+    { "id": "ack",     "label": "Ack",     "prompt": "#projectx-ack {alertId}" },
+    { "id": "explain", "label": "Explain", "prompt": "#projectx-explain {alertId}" }
   ]
 }
 ```
@@ -391,7 +391,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.39 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.40 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path

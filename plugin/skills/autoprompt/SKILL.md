@@ -70,7 +70,7 @@ Single entry point - **`/autoprompt [verb] [args]`**, dispatching on the first a
 
 Verbs are lowercase. A project literally named `send`, `show`, `clear`, or `config` needs the
 explicit `send`. Natural language maps the obvious way: "send this to android-dmgz", "hand this
-off to the dpp agent" -> `send`; "what's waiting for android-dmgz?" -> `show`.
+off to the projectx agent" -> `send`; "what's waiting for android-dmgz?" -> `show`.
 
 ### `projectDir`
 
@@ -102,8 +102,8 @@ still works.
 | `/autoprompt android-dmgz 'my amazing prompt'` | that text | true |
 | `/autoprompt android-dmgz ~/notes/handoff.md false` | that file | false |
 | `/autoprompt android-dmgz false` | agent-authored | false |
-| `/autoprompt dpp 'my amazing prompt' vscode` | that text | true, `ide` vscode |
-| `/autoprompt dpp idea false` | agent-authored | false, `ide` idea |
+| `/autoprompt projectx 'my amazing prompt' vscode` | that text | true, `ide` vscode |
+| `/autoprompt projectx idea false` | agent-authored | false, `ide` idea |
 
 `shouldStartIDE` defaults to true. False maps to the script's `--no-ide`. `ide` maps to
 `--ide <ide>`; omitted, the script picks (see **What `send` does**, step 4).
@@ -216,7 +216,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.39 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.40 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE] [ide]  - write the next drop; open the IDE if no live window
 • show [projectDir]                                  - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                                 - move waiting drops to the Trash
