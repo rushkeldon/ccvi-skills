@@ -1,6 +1,6 @@
 ---
 name: autoprompt
-description: send•show•clear•config - hand a prompt to the agent in ANOTHER project by writing a CCVI auto-prompt dead drop into that project's per-worktree git dir and, unless told not to, opening it in the right IDE (a named one, else the IDE it last ran in, else Android Studio for Android, else a configured preference) so the CCVI window there runs it as its next turn, via /autoprompt [verb]. Use when the user (or an agent) wants to send work, a brief, or a prompt to another repo's session, or to inspect or clear prompts waiting for one.
+description: send•open•show•clear•config - hand a prompt to the agent in ANOTHER project by writing a CCVI auto-prompt dead drop into that project's per-worktree git dir and, unless told not to, opening it in the right IDE (a named one, else the IDE it last ran in, else Android Studio for Android, else a configured preference) so the CCVI window there runs it as its next turn, via /autoprompt [verb]; open does only the IDE half, sending nothing. Use when the user (or an agent) wants to send work, a brief, or a prompt to another repo's session, to open another project in its IDE, or to inspect or clear prompts waiting for one.
 argument-hint: "[verb] {projectDir} [prompt] [shouldStartIDE] [ide]"
 allowed-tools: Read, Bash(python3:*)
 # Machine-readable verb schema (host-facing). The prose below remains authoritative
@@ -12,9 +12,11 @@ verbs:
                                 { name: prompt,         type: string,  required: false },
                                 { name: shouldStartIDE, type: boolean, required: false, default: true },
                                 { name: ide,            type: string,  required: false } ] }
-  show:   { order: 2, params: [ { name: projectDir, type: string, required: false } ] }
-  clear:  { order: 3, params: [ { name: projectDir, type: string, required: true } ] }
-  config: { order: 4, params: [ { name: key,   type: string, required: false },
+  open:   { order: 2, params: [ { name: projectDir, type: string, required: true },
+                                { name: ide,        type: string, required: false } ] }
+  show:   { order: 3, params: [ { name: projectDir, type: string, required: false } ] }
+  clear:  { order: 4, params: [ { name: projectDir, type: string, required: true } ] }
+  config: { order: 5, params: [ { name: key,   type: string, required: false },
                                 { name: value, type: string, required: false } ] }
 ---
 
@@ -62,15 +64,16 @@ Single entry point - **`/autoprompt [verb] [args]`**, dispatching on the first a
 | Form | Effect |
 |---|---|
 | `/autoprompt send {projectDir} [prompt] [shouldStartIDE] [ide]` | Write the next drop for `projectDir`; open its IDE if no live window is there |
+| `/autoprompt open {projectDir} [ide]` | Open the project in its IDE and send NOTHING; a live window there means nothing is launched |
 | `/autoprompt show [projectDir]` | Report what `send` would do, plus waiting drops; with no arg, the config. Writes nothing |
 | `/autoprompt clear {projectDir}` | Move the project's waiting drops to the Trash (`~/.Trash`; the XDG trash off macOS) |
 | `/autoprompt config [key] [value]` | Show all config, show one key, or set one |
 | `/autoprompt {projectDir} ...` | Shorthand for `send` - any first arg that is not a verb |
 | `/autoprompt` (no args) | Print the help cheat-sheet (see **Help output**) |
 
-Verbs are lowercase. A project literally named `send`, `show`, `clear`, or `config` needs the
+Verbs are lowercase. A project literally named `send`, `open`, `show`, `clear`, or `config` needs the
 explicit `send`. Natural language maps the obvious way: "send this to android-dmgz", "hand this
-off to the projectx agent" -> `send`; "what's waiting for android-dmgz?" -> `show`.
+off to the projectx agent" -> `send`; "open android-dmgz in its IDE" -> `open`; "what's waiting for android-dmgz?" -> `show`.
 
 ### `projectDir`
 
@@ -137,6 +140,7 @@ AUTOPROMPT_EOF
 ```
 
 ```bash
+python3 "{SKILL_DIR}/scripts/autoprompt.py" open "<projectDir>" [--ide <ide>]
 python3 "{SKILL_DIR}/scripts/autoprompt.py" show ["<projectDir>"]
 python3 "{SKILL_DIR}/scripts/autoprompt.py" clear "<projectDir>"
 python3 "{SKILL_DIR}/scripts/autoprompt.py" config ["<key>" ["<value>"]]
@@ -189,6 +193,16 @@ the drop; it queues behind the current turn like a typed prompt, and the report 
 state. The report also notes when another worktree of the same repo is open instead, or when
 two windows share the worktree (either may take the drop).
 
+## What `open` does
+
+`send`'s steps 1, 3, 4, and 7 with no prompt: it resolves `projectDir`, finds live windows,
+picks the IDE by the same five rungs, and launches it with the same idempotent guards (`not
+relaunched`). It writes **no drop**, so it skips step 5's drop-capability check: an IDE whose
+CCVI cannot take drops can still be opened. A live window on the project means nothing is
+launched (`ide: <App> (live window) - already open; nothing launched`). The report has the same
+`window:` and `ide:` lines as `send`. ccvi-idea's sidecar runs it when a page's
+`CCVI.focusWindow({ to })` targets a project with no live window.
+
 ## Config
 
 Stored in `~/.ccvi/autoprompt.json`:
@@ -216,8 +230,9 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.44 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.45 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE] [ide]  - write the next drop; open the IDE if no live window
+• open {projectDir} [ide]                            - open the project in its IDE; send nothing
 • show [projectDir]                                  - what send would do + waiting drops (no arg: config)
 • clear {projectDir}                                 - move waiting drops to the Trash
 • config [key] [value]                               - workingDir | idePreferred (idea, vscode, cursor)

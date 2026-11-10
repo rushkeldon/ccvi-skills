@@ -255,7 +255,10 @@ same runtime, and can be opened in a browser to develop it.
   transparent; the page paints everything visible, so a full-page background shows as a solid
   rectangle.
 - **A page reaches a window only through `window.CCVI`.** Never `fetch` the page's own origin
-  and never read `location.host`.
+  and never read `location.host`. `CCVI.send(text, { to })` and `CCVI.focusWindow({ to })`
+  accept an absolute project folder or git dir; when that project has no live window, `send`
+  delivers by autoprompt and opens its IDE, and `focusWindow` opens its IDE and sends nothing.
+  Each result then carries `opened: true`. A bare project name with nothing live is refused.
 - **A toast never sends without a click.** No `CCVI.send` from a timer, a load handler, or the
   dismiss event. A timeout only dismisses.
 - **The body's own height is the toast's height**, so never give `body` a percentage height.
@@ -561,7 +564,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.44 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.45 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path

@@ -557,6 +557,32 @@ def main():
         rc, out = run(dhome, ["clear", plain])
         check("directives/clear takes both spellings", rc == 0 and listing(d) == [], listing(d))
 
+        # ---- open: send's IDE half, never a drop
+        op = make_repo(os.path.join(work, "open_target"))
+        rc, out = run(home, ["open", op])
+        check("open/no window launches", rc == 0 and "window: none open" in out
+              and ide_line(out).startswith("ide: IntelliJ IDEA (preference) - would run: open -a"),
+              out)
+        check("open/writes no drop", listing(ccvi_dir(op)) == [], listing(ccvi_dir(op)))
+        rc, out = run(home, ["open", op, "--ide", "vscode"])
+        check("open/--ide rung and no drop-capability check",
+              rc == 0 and "(--ide) - would run: open -a" in ide_line(out), out)
+        launches(home, {op: ("idea", 5000)})
+        rc, out = run(home, ["open", op])
+        check("open/recent launch is not relaunched", rc == 0
+              and "not relaunched" in ide_line(out), out)
+        FAKE["ids"] = [ident(op, editor="idea")]
+        rc, out = run(home, ["open", op])
+        check("open/live window launches nothing", rc == 0 and out.startswith("open -> ")
+              and "window: live in" in out and "already open; nothing launched" in ide_line(out),
+              out)
+        FAKE["ids"] = []
+        check("open/still no drop", listing(ccvi_dir(op)) == [], listing(ccvi_dir(op)))
+        rc, out = run(home, ["open", notgit])
+        check("open/non-git refused", rc == 1 and out.startswith("refused:"), out)
+        rc, out = run(home, ["open"])
+        check("open/usage error is exit 2", rc == 2, out)
+
         # ---- show writes nothing
         before = listing(d)
         run(home, ["show", plain])

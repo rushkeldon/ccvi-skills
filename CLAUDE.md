@@ -199,6 +199,17 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   any machine. Frozen in ccvi-idea's `doc/contracts/toast.md`; a verb, flag, or exit-code
   change is a coordinated change across both repos.
 
+- **The autoprompt script, as ccvi-idea's sidecar calls it** - for a page click aimed at a
+  project with no live window (ccvi-idea `sidecar/src/aio_autoprompt.ts`):
+  `python3 <plugin>/skills/autoprompt/scripts/autoprompt.py send <projectDir> --prompt-stdin`
+  (a `CCVI.send({ to })`: writes the drop and opens the IDE) and
+  `python3 <plugin>/skills/autoprompt/scripts/autoprompt.py open <projectDir> [--ide <ide>]`
+  (a `CCVI.focusWindow({ to })`: opens the IDE, writes nothing). The sidecar reads the first
+  stdout line starting `ide:`; exit `0` success, `1` refusal (a `refused:` line), `2` usage
+  error, which the sidecar reads as "this ccvi-skills predates `open`". The script path, the
+  verbs, the flags, the `ide:` line, and the exit codes are the contract; frozen in ccvi-idea's
+  `doc/contracts/auto_prompt.md` and `doc/contracts/aio.md` ("A project with no live window").
+
 ## BBP / BBPI - bump, build, push, install (the end-of-work ritual)
 
 At the end of any finished bit of work - a plan built, a fix landed, any coherent

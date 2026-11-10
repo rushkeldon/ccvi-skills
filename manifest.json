@@ -1,6 +1,6 @@
 {
   "name": "ccvi-skills",
-  "version": "0.0.44",
+  "version": "0.0.45",
   "skills": [
     {
       "name": "modes",
@@ -528,6 +528,21 @@
               "required": false,
               "kind": "flag",
               "default": "1"
+            },
+            {
+              "name": "ide",
+              "required": false,
+              "kind": "freeform"
+            }
+          ]
+        },
+        {
+          "name": "open",
+          "params": [
+            {
+              "name": "projectDir",
+              "required": true,
+              "kind": "dir"
             },
             {
               "name": "ide",

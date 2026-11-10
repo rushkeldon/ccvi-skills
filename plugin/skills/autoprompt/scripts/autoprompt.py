@@ -10,10 +10,15 @@ script is a writer only.
 Contract:
   autoprompt.py send   <projectDir> [--no-ide] [--ide as|idea|vscode|cursor]
                        (--prompt-arg-stdin | --prompt-stdin)
+  autoprompt.py open   <projectDir> [--ide as|idea|vscode|cursor]
   autoprompt.py show   [<projectDir>]
   autoprompt.py clear  <projectDir>
   autoprompt.py config [<key> [<value>]]
 
+  open    = send's IDE half alone: the same project resolution, /whoami sweep, IDE rungs, and
+            idempotent launch, but NO drop and no drop-capability check. A live window on the
+            project means nothing is launched. ccvi-idea's sidecar runs it when a page's
+            CCVI.focusWindow targets a project with no live window.
   stdin   = for send: the prompt. --prompt-arg-stdin means "the user's raw prompt argument"
             (classified here as literal text or a .md path); --prompt-stdin means
             agent-authored text, always literal.
@@ -882,6 +887,28 @@ def cmd_send(raw_project, should_start_ide, prompt_mode, stdin_text, ide=None):
     return "\n".join(lines)
 
 
+def cmd_open(raw_project, ide=None):
+    """Open the project in its IDE and send nothing. Same rungs and launch as send; no drop,
+    so no capability check: an IDE whose CCVI can't take drops can still be opened."""
+    project_dir, _ = resolve_project(raw_project)
+    exact, siblings, stale = live_windows(project_dir)
+    editor_id, reason = choose_ide(project_dir, exact, stale, ide)
+    app = APP.get(editor_id, editor_id)
+    lines = ["open -> %s" % project_dir]
+    if exact:
+        lines.append("window: live in %s" % window_line(exact[0]))
+        lines.append("ide: %s (%s) - already open; nothing launched" % (app, reason))
+    else:
+        lines.append("window: none open")
+        lines.append("ide: %s (%s) - %s" % (app, reason, launch_ide(editor_id, project_dir)))
+    if siblings and not exact:
+        lines.append("note: other worktrees of this repo are open: " + ", ".join(
+            "%s (%s)" % (r.get("cwd"), r.get("editorId", "unknown")) for r in siblings))
+    if exact and ide and ide != editor_id:
+        lines.append("note: --ide %s ignored; a live %s window is already open" % (ide, app))
+    return "\n".join(lines)
+
+
 def age(rec):
     secs = max(0, (now_ms() - int(rec.get("updatedAtMs", 0))) // 1000)
     if secs < 120:
@@ -972,6 +999,9 @@ def main(argv):
     g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("--prompt-arg-stdin", action="store_true")
     g.add_argument("--prompt-stdin", action="store_true")
+    o = sub.add_parser("open")
+    o.add_argument("projectDir")
+    o.add_argument("--ide", choices=list(APP))
     sh = sub.add_parser("show")
     sh.add_argument("projectDir", nargs="?")
     c = sub.add_parser("clear")
@@ -984,6 +1014,8 @@ def main(argv):
         if a.verb == "send":
             mode = "arg" if a.prompt_arg_stdin else "authored"
             out = cmd_send(a.projectDir, not a.no_ide, mode, sys.stdin.read(), a.ide)
+        elif a.verb == "open":
+            out = cmd_open(a.projectDir, a.ide)
         elif a.verb == "show":
             out = cmd_show(a.projectDir)
         elif a.verb == "clear":
