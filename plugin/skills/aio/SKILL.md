@@ -118,14 +118,15 @@ Single entry point - **`/aio [noun] [verb] [args]`**, dispatching on the first t
 | `/aio html list [scope]` | The html entries that exist, with their labels and URLs |
 | `/aio html url {name}` | Print the URL of an entry (project first, then global) |
 | `/aio html archive {name}` | Move `<scope>/html/<name>/` into `<scope>/html/archive/<name>/`; never deletes |
-| `/aio html toast {name} [scope]` | Display an entry as a macOS toast through the toast script; `scope` pins `project` or `global` (default: project first, then global) |
+| `/aio html toast {name} [scope]` | Display an entry as a macOS toast through the toast script; `scope` pins `project` or `global` (default: project first, then global). The literal name `clear` dismisses every toast instead |
 | `/aio` (no args) | Print the help cheat-sheet (see **Help output**) |
 
 Nouns and verbs are lowercase. A bare noun (`/aio hashcmd`, `/aio html`) prints the help
 output. Natural language maps the obvious way: "make a hash command for X" -> `hashcmd write`;
 "what #commands do I have?" -> `hashcmd list`; "retire #foo" -> `hashcmd archive`; "make me a
 dashboard for X" -> `html write`; "where is my status page?" -> `html url`; "ping me when this
-is done" or "ask me with a toast" -> `html toast`.
+is done" or "ask me with a toast" -> `html toast`; "clear the toasts" or "get rid of that stuck
+toast" -> `html toast clear` (or `dismiss <id>` when the one toast's id is known).
 
 ---
 
@@ -283,7 +284,8 @@ opens `/aio/`, and its menu lists both scopes' entries by label.
 **Reserved names.** `html write` refuses `ccvi` (the URL segment for the global scope, so a
 project entry by that name could never be reached), `archive` (where `html archive` moves
 retired entries; never listed), `index` (the global `html/index/` folder overrides the hub at
-`/`), and `themes` (toast themes). `options` and `turn_end` are the two **built-in** global
+`/`), `themes` (toast themes), and `clear` (`html toast clear` clears the toasts, so a page by
+that name could never be displayed). `options` and `turn_end` are the two **built-in** global
 pages; writing one at global scope is allowed only when the user asks to override the
 built-in, and a real folder of that name then wins.
 
@@ -302,6 +304,7 @@ The one home for an entry's metadata. Every key is optional; no file means defau
     "height": null,
     "timeoutMs": 0,
     "capturesOutside": false,
+    "shadowBottom": 0,
     "description": "One line: what this toast does.",
     "useWhen": "One line: when an agent should display it.",
     "fields": {
@@ -320,6 +323,9 @@ The one home for an entry's metadata. Every key is optional; no file means defau
 - `toast.width` defaults to 360; `height: null` means "measure the content". A page whose
   `toast` has a `description` is advertised by the toast script's `list`; any page can still
   be displayed by name. `fields` is what `display` validates the data against.
+- `toast.shadowBottom` (points, default 0) is the transparent strip at the bottom of the page
+  that holds only its shadow; the next toast in the stack tucks under it so stacked cards sit
+  close. A page that pads its body to hold a shadow declares it (the built-ins declare 26).
 - Older pages carry `<meta name="ccvi:label|ccvi:order|ccvi:hidden">` tags instead. Those still
   work as a fallback, and the manifest wins over them. Do not write them in new pages.
 
@@ -487,7 +493,8 @@ exposes a global entry of the same name, say so. Echo the new path.
 
 `/aio html toast {name} [scope]` - display an entry as a macOS toast, through the **toast
 script** named on the sentinel's `toast:` line. Writing the page is `html write`; this verb
-only displays it.
+only displays it. **`{name}` = `clear`** is not a page: it runs the script's `clear` (see
+**Taking toasts down**) and skips steps 2-4.
 
 1. **No `toast:` line in the sentinel: stop, and say the `<ccvi-aio>` sentinel carries no
    `toast:` line, so toasts are unavailable on this host.** The sentinel is the ONLY source of
@@ -526,7 +533,15 @@ only displays it.
    4  toast host not installed
    ```
 
-`~/.ccvi/node/current/bin/node <toast path> dismiss <id>` takes a displayed toast down.
+**Taking toasts down.** Step 1's sentinel rule applies here too.
+
+```bash
+~/.ccvi/node/current/bin/node <toast path> dismiss <id>   # one toast, by the id display printed
+~/.ccvi/node/current/bin/node <toast path> clear          # every toast on screen, and any still waiting
+```
+
+Each prints a one-line confirmation (`toast dismissed: <id>`, `toasts cleared`) and exits 0, or
+exits 4 when the toast host is not installed.
 
 **Use toasts sparingly.** A toast interrupts the user in whatever app they are in. Follow the
 page's `useWhen` (`turn_end` is for long tasks, never routine turn ends). The toast's buttons
@@ -545,7 +560,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.42 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.43 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
@@ -555,7 +570,7 @@ with exactly this - no preamble, no postscript:
 • html list [scope]              - the entries that exist, with labels and URLs
 • html url {name}                - the URL of an entry: /aio/<name>/ or /aio/ccvi/<name>/
 • html archive {name}            - move html/<name>/ to html/archive/<name>/; never deletes
-• html toast {name} [scope]      - display an entry as a macOS toast via the sentinel's toast: script (list, describe, display)
+• html toast {name} [scope]      - display an entry as a macOS toast via the sentinel's toast: script (list, describe, display); name clear dismisses every toast
 
 Running a command is just typing it: #name payload. Agent -> page: write data/*.json.
 Page -> agent: CCVI.send('#command payload'), an ordinary turn. Paths come from the <ccvi-aio> sentinel.
