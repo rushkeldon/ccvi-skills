@@ -151,7 +151,7 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   Its purpose is a host whose plan directory is set to something other than `doc` - without
   the hint, plans land in `notes/` while logs land in `doc/logs/autonomy/`.
 - **`<ccvi-aio>` sentinel** - where the aio workspace (hash commands and html) lives, for
-  the `/aio` skill. Injected by ccvi-idea as a four-line body with the same trust
+  the `/aio` skill. Injected by ccvi-idea as a four-line body (plus the optional `toast` line below) with the same trust
   rules as `<ccvi-modes>` and its own epoch counter:
 
   ```text
@@ -160,6 +160,7 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   project: /Users/k/.ccvi/projects/-Users-k-Desktop-working-projectx/aio
   prefix: projectx-
   url: http://127.0.0.1:17396/
+  toast: /Users/k/.ccvi/toast/toast_display.mjs
   </ccvi-aio>
   ```
 
@@ -167,16 +168,36 @@ The ccvi-idea build pulls this repo's artifacts and hard-depends on:
   binds. It exists because a resumed session replays the system prompt snapshotted at
   session creation, so the capability blurb cannot be trusted to carry the port.
 
+  `toast` (added 2026-11-10) is an optional FIFTH line, `toast: <absolute path of
+  toast_display.mjs>`, present only on macOS with the toast host installed. **No `toast`
+  line means toasts are unavailable on that host**, and `/aio html toast` says so and stops.
+  The script lives at a stable path (`~/.ccvi/toast/toast_display.mjs`), but the skill names
+  it only through this line, never by guessing or falling back to that path, so a host that
+  omits the line fails visibly and gets fixed.
+
   Both paths are absolute by nature (this sentinel states a fact, not a preference, so the
   `<ccvi-doc-dir>` containment rule does not apply). `prefix` is the project's hash-command
   namespace. Without the sentinel the skill knows only the global scope (`~/.ccvi/aio`)
-  and say the project scope is unknown. The four line labels, the tag, and ccvi-idea's
+  and say the project scope is unknown. The five line labels, the tag, and ccvi-idea's
   `<ccvi-hash-cmd>` wrapper and html routes are frozen in ccvi-idea's
   `doc/contracts/aio.md`; a rename is a coordinated change across both repos.
 - **`ccvi_manifest.json`** - an aio html entry's metadata file, `<scope>/html/<name>/ccvi_manifest.json`.
-  Keys, all optional: `label`, `order`, `hidden`, and `failover` (default true). Its
-  `label`/`order`/`hidden` win over the older `ccvi:*` meta tags, which stay a fallback.
-  `/aio html write` scaffolds it. Frozen in ccvi-idea's `doc/contracts/aio.md`.
+  Keys, all optional: `label`, `order`, `hidden`, `failover` (default true), and a `toast` block
+  (`width`, `height`, `timeoutMs`, `capturesOutside`, `shadowBottom`, `description`, `useWhen`,
+  `fields`). Its `label`/`order`/`hidden` win over the older `ccvi:*` meta tags, which stay a
+  fallback. `/aio html write` scaffolds it. Frozen in ccvi-idea's `doc/contracts/aio.md`
+  (the `toast` block in `doc/contracts/toast.md`).
+- **The toast script's CLI** - run as `~/.ccvi/node/current/bin/node <toast path> <verb>`:
+  `list [--json]`, `describe <name> [--scope project|global]`, `display <name> [--data-json
+  JSON | --data-stdin] [--id ID] [--scope project|global] [--theme NAME] [--timeout-ms N]
+  [--dir auto|ltr|rtl]`, `dismiss <id>`, and `clear` (every toast on screen, and any waiting).
+  Exit codes: `0` ok (prints `toast displayed: <id>`, `toast dismissed: <id>`, or `toasts
+  cleared`), `2` bad request (its output lists the page's fields, and `/aio html toast` treats
+  that as the field reference), `3` no live CCVI window, `4` toast host not installed (absent,
+  or present but unable to run). `display` validates the whole request (page, fields, theme,
+  arguments) before the window (3) and host (4) checks, so exit 2 and its field list work on
+  any machine. Frozen in ccvi-idea's `doc/contracts/toast.md`; a verb, flag, or exit-code
+  change is a coordinated change across both repos.
 
 ## BBP / BBPI - bump, build, push, install (the end-of-work ritual)
 

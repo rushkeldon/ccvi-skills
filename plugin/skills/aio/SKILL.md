@@ -38,7 +38,8 @@ one skill manages both, as two nouns:
 
 Both nouns share one invariant: the scope rule (project first, then global), the
 `<ccvi-aio>` sentinel, the project prefix, and **never deleting** (retiring is a move into an
-`archive/` folder). The contract is ccvi-idea's `doc/contracts/aio.md`.
+`archive/` folder). The contract is ccvi-idea's `doc/contracts/aio.md`; the toast script's
+commands, exit codes, and the manifest's `toast` block are defined in its `doc/contracts/toast.md`.
 
 ## Where everything lives
 
@@ -530,7 +531,7 @@ only displays it. **`{name}` = `clear`** is not a page: it runs the script's `cl
    2  bad request: unknown page, missing field, or bad argument. The output lists the
       page's fields; it IS the field reference. Fix the data and retry once.
    3  no live CCVI window to serve the toast
-   4  toast host not installed
+   4  toast host not installed (absent, or present but unable to run)
    ```
 
 **Taking toasts down.** Step 1's sentinel rule applies here too.
@@ -560,7 +561,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.43 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.44 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
