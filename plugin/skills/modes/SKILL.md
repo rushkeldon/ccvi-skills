@@ -711,7 +711,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.41:
+Modes · v0.0.42:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] [timerDuration=N] [subagents=peer|economy[,optional]] — autonomous keep-moving loop; hand-off at pct% context (20-99); wakeup every N min (20-60, default 20); clears all modes on entry; mutex with plan/agent

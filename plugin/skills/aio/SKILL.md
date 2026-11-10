@@ -489,8 +489,10 @@ exposes a global entry of the same name, say so. Echo the new path.
 script** named on the sentinel's `toast:` line. Writing the page is `html write`; this verb
 only displays it.
 
-1. **No `toast:` line in the sentinel: say toasts are unavailable on this host and stop.**
-   Never guess the script's path.
+1. **No `toast:` line in the sentinel: stop, and say the `<ccvi-aio>` sentinel carries no
+   `toast:` line, so toasts are unavailable on this host.** The sentinel is the ONLY source of
+   the script's path. Never guess it, search for it, or fall back to a known location: a
+   missing line must fail visibly so the host can be fixed.
 2. Run the script with the CCVI node, from the project root (the script finds the calling
    window by the cwd's git checkout):
 
@@ -543,7 +545,7 @@ When the user runs `/aio` with no arguments, or a bare noun (or asks what it can
 with exactly this - no preamble, no postscript:
 
 ```text
-/aio · v0.0.41 - the aio workspace: #commands and served html, project scope wins over global:
+/aio · v0.0.42 - the aio workspace: #commands and served html, project scope wins over global:
 • hashcmd write {name} [scope]   - author or overwrite <scope>/hash_cmds/<name>.md (scope: project | global; project names get the prefix)
 • hashcmd list [scope]           - what resolves now, collisions marked, with the winner
 • hashcmd show {name}            - the file that would win for #name, and its path
