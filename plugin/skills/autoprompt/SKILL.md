@@ -230,7 +230,7 @@ When the user runs `/autoprompt` with no arguments (or asks what it can do), rep
 this - no preamble, no postscript:
 
 ```text
-/autoprompt · v0.0.45 - send a prompt to another project's CCVI session:
+/autoprompt · v0.0.46 - send a prompt to another project's CCVI session:
 • send {projectDir} [prompt] [shouldStartIDE] [ide]  - write the next drop; open the IDE if no live window
 • open {projectDir} [ide]                            - open the project in its IDE; send nothing
 • show [projectDir]                                  - what send would do + waiting drops (no arg: config)

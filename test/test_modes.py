@@ -529,11 +529,17 @@ def main():
           "handed to another session is verified by that session's isDone" in modes_mod.LAW["agent-loop"], "")
     check("aloop/session-verdict-no-worker", "(a worker's self-report" not in modes_mod.LAW["agent-loop"], "")
 
+    # 25. The air gap (2026-11-12): on a CCVI host a machine-origin send never folds into a running
+    # turn, so an orchestrator that chains units starves its own queue. Pinned in both copies.
+    check("aloop/air-gap-script", "• LAND BETWEEN UNITS — a host delivers queued messages" in modes_mod.LAW["agent-loop"], "")
+    check("aloop/air-gap-md", "• LAND BETWEEN UNITS — a host delivers queued messages"
+          in extract_law_block(open(SKILL_MD, encoding="utf-8").read(), "agent-loop"), "")
+
     # THE ANTI-EROSION FLOOR (see the guard comment above). Deleting a check drops the count
     # and fails here; re-pointing one (law -> body) keeps it and passes, because the lesson
     # still exists. Raise it when you add checks. LOWERING it is the act this floor exists to
     # make visible — treat that as a stop-and-ask, not a judgment call.
-    MIN_CHECKS = 156
+    MIN_CHECKS = 158
     if _count < MIN_CHECKS:
         _failures.append(
             "harness/no-erosion  check count {} is below the floor {} — a tripwire was "

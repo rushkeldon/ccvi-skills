@@ -184,6 +184,7 @@ The autonomous keep-moving flywheel. The mode is a **two-state contract**: enter
 • LAND WITH WORK IN FLIGHT AND A WAKEUP ARMED, or do not land. The binding check is at the LANDING: in flight means a RUNNING SUB-AGENT; a wakeup with nothing running is NOT compliance, and doing a unit yourself is compliance only while the turn lasts, never a state to land in. The one exception is an entry carrying `subagents=optional`: there a landing with the wakeup armed is compliant, and the wakeup is still mandatory.
 • arm FIRST on seeded and resumed turns — and on any woken turn — before any work, because a turn that dies before its first tool call leaves NOTHING armed. The wakeup is LONG (the entry's `timerDuration` minutes, 20 when unset), is insurance behind running work rather than a schedule, and carries this mode's own re-entry brief as its prompt, never a generic sentinel.
 • EVERY WAKE RE-ESTABLISHES THE INVARIANT FIRST — a returning worker spawns its successor; a wakeup firing with nothing in flight spawns before it does anything else.
+• LAND BETWEEN UNITS — a host delivers queued messages (worker returns, drops, the user's own words behind them) only when a turn ENDS, so an orchestrator lands after each unit of orchestration with the wakeup armed rather than chaining the next unit onto the same turn; a turn that runs long is holding the queue shut.
 • DELEGATE BY DEFAULT, IN PARALLEL wherever independent units exist — one worker is the floor, not the target. gate exclusive resources: a resource only one worker can safely hold gets AT MOST ONE holder, and the next worker gets non-conflicting work rather than a queue position.
 • DECIDE, LOG, CONTINUE. Stop and ask ONLY for: contradicting the project's stated guidance with no compliant path; a compounding, hard-to-reverse fork the guidance cannot arbitrate; destructive actions; real-world money. Cost and effort forecasts are NEVER a reason to stop, shrink or ask — yours run in human-engineer units and are reliably wrong.
 • STATE WHAT MUST BE RESOLVED, AND THE CHECK THAT PROVES IT, BEFORE NAMING ANY TOOL. An unusable result restarts at that statement, never at a write-up — re-tooling produces nothing visible and is still the work.
@@ -312,6 +313,10 @@ instead. **Repetition and derivation are substitutes** — the block was dense b
 repetition was doing all the work of making it stick, and the encode step buys that back more
 cheaply, which is what makes the shorter block viable rather than merely shorter.
 
+- **Why the air gap:** on CCVI, machine-origin sends (autoprompt drops, wakeups, nudges) never
+  fold into a running turn (the `ccvc` fence in the sidecar's `subprocess.ts`); they wait for a
+  turn end, one per end. A human message queued behind one waits too. The law's land-between-units
+  bullet is the only seam the orchestrator can offer; nothing inside a turn drains that queue.
 - **Wake sources:** never cron for the heartbeat. Scheduled cloud agents and new-instance
   spawners are NOT wake sources — they spawn fresh sessions with fresh context, defeating the
   same-session point of the loop. The heartbeat is an in-session wakeup armed behind in-flight
@@ -711,7 +716,7 @@ Do not surface this branch unless a tool actually got denied — the happy path 
 When the user asks for the cheat sheet (any natural-language phrasing — "show me the modes", "what modes are available?", "modes cheat sheet"), reply with this exact text — preserve the structure, bullets, and order. No paraphrasing, no preamble, no closing remarks:
 
 ```text
-Modes · v0.0.45:
+Modes · v0.0.46:
 • plan [dir] — new *.plan.md created in [dir] (default ./); edit/copy/move any existing .md anywhere; md-delete & non-md writes blocked; mutex with agent
 • agent — full agency; mutex with plan
 • agent-loop [pct] [timerDuration=N] [subagents=peer|economy[,optional]] — autonomous keep-moving loop; hand-off at pct% context (20-99); wakeup every N min (20-60, default 20); clears all modes on entry; mutex with plan/agent
